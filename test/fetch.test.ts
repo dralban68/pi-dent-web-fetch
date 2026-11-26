@@ -305,6 +305,25 @@ test("5.4 adds the title as a heading when the content has none, else the first 
   assert.equal((await call(cwd, { url: `${server.origin}/h` })).details.title, "Only H1");
 });
 
+test("5.4 the title heading is escaped, so it holds no HTML tag", async (t) => {
+  const server = await startServer(t);
+  const cwd = await tempDir(t);
+  server.route(
+    "/e",
+    html(
+      `<article><p>${"Plain words. ".repeat(30)}</p></article>`,
+      "<title>&lt;table&gt; *element*</title>",
+    ),
+  );
+  const result = await call(cwd, { url: `${server.origin}/e` });
+  assert.ok(
+    (await readFile(join(cwd, result.details.path), "utf8")).startsWith(
+      "# \\<table> \\*element\\*\n",
+    ),
+  );
+  assert.equal(result.details.title, "<table> *element*");
+});
+
 test("5.3 converts a table to a GFM table and keeps its caption", async (t) => {
   const server = await startServer(t);
   const cwd = await tempDir(t);

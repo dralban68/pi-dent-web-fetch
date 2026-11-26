@@ -111,7 +111,8 @@ function addHeading(markdown: string, title: string | null): string {
   if (title === null) return markdown;
   const first = markdown.split("\n").find((line) => line.trim() !== "");
   if (first?.startsWith("# ")) return markdown;
-  return markdown === "" ? `# ${title}\n` : `# ${title}\n\n${markdown}`;
+  const heading = `# ${converter.escape(title)}`;
+  return markdown === "" ? `${heading}\n` : `${heading}\n\n${markdown}`;
 }
 
 /** The HTML pipeline of Section 5.2. */

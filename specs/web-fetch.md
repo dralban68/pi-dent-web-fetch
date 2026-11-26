@@ -311,7 +311,8 @@ ends trimmed; null when empty. For Markdown, it is the text after `# ` on the fi
 starts with `# `; for plain text, null.
 
 When the HTML title is not null and the first non-empty line of the Markdown does not start with
-`# `, the tool MUST prepend `# <title>` and an empty line.
+`# `, the tool MUST prepend `# <title>` and an empty line, the title escaped as turndown escapes
+text, with the `\<` rule of Section 5.3.
 
 When `extracted.md` is empty, the tool adds the notice `The page produced no text.`
 
