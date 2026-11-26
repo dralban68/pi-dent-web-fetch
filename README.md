@@ -1,85 +1,66 @@
 # pi-dent-web-fetch
 
-A pi extension whose `WebFetch` tool fetches a web page as Markdown and caches it, by default under
-the session's working folder in `.pi/web-cache/`, so a page fetched once can be read and searched from
-disk by later turns and sessions. A sanitizer keeps text a reader would not see out of the result,
-and an optional second model can fix the Markdown's formatting, accepted only where a check proves
-the text unchanged. pi-dent bundles it through its `pi.extensions`.
+A pi extension whose `WebFetch` tool lets an agent fetch a web page, PDF or file into a cache on
+disk and read it from there. pi-dent bundles it; it also runs standalone in pi.
 
-## The tool
+## Why
 
-`WebFetch` takes `url` (http or https), `refresh`, `maxAgeHours` (default 24), `reformat` and
-`cache` (the cache location, below).
-It returns the path of the cached `content.md`, the status (`fetched`, `cached`, `revalidated` or
-`stale`), the title, final URL, fetch time, length, and a preview of the first 4000 characters.
-A fresh entry is served without network access; an older one is revalidated with its `ETag` or
-`Last-Modified`. Loopback, private and link-local addresses are refused, redirects included.
+An agent that pastes whole pages into its context pays for every token, and reads any text a page
+hides from humans: hidden elements, invisible PDF text, zero-width characters, all ways to smuggle
+in instructions. So `WebFetch` writes the page to disk as Markdown and returns only its path, a
+status and a 4000-character preview; the agent reads more from the file when it needs to. A
+deterministic sanitizer removes what a reader would not see before anything reaches the model.
 
-A response that is not HTML, Markdown, plain text or data text (JSON, CSV, XML) is downloaded,
-not refused: the body is stored unchanged in the cache entry as `file.<ext>` (the extension from
-the content type, else the URL, else `bin`; never a server-supplied file name), and the result
-gives the file's path, type and size, never its bytes. A PDF is stored too, and its text is
-extracted into `content.md`, one `## Page n` section per page, with text a reader cannot see
-(invisible render mode, below 1 pt, off the page) dropped. Text bodies are capped at 10 MiB,
-stored files at 50 MiB.
+Binaries never enter the context: they are stored as files the agent can hand to other tools. The
+network guard refuses loopback, private and link-local addresses, redirects included, so a page
+cannot steer the agent into the local network.
 
-## Configuration
+## How it works
 
-In pi-dent's `pi-dent.conf`:
+- **Input:** `url` (http or https), and optionally `refresh`, `maxAgeHours` (default 24),
+  `reformat` and `cache`.
+- **HTML** goes through the sanitizer, then Readability and conversion to Markdown. Markdown and
+  plain text keep their text; their embedded HTML is sanitized.
+- **JSON, CSV and XML** are kept as cleaned text, their structure intact.
+- **Anything else** is saved unchanged as `file.<ext>` in the cache entry; the result gives its
+  path, type and size, never its bytes. A **PDF** is saved too, and its text extracted, one
+  `## Page n` section per page, without invisible, sub-1 pt or off-page text.
+- **Cache:** one folder per URL, `<host>/<slug>-<hash>/`, holding `content.md`, `extracted.md`,
+  `meta.json` and any stored file. A fresh entry is served with no network access; an older one is
+  revalidated with its `ETag` or `Last-Modified`; if a refetch fails, the old copy is served as
+  `stale`.
+- **Reformat (optional):** a second model fixes the Markdown's structure; a chunk is accepted only
+  when a check proves its text, code and links unchanged.
+- **Limits:** 30 s to fetch, PDF extraction included; 10 MiB for text bodies, 50 MiB for stored
+  files; 100 PDF pages.
 
-```jsonc
-{
-  "web": {
-    "reformat": true, // the default of the reformat parameter
-    "reformatModel": "fast", // a model string or a modelClasses class
-    "cache": "project", // the cache location, below
-  },
-}
-```
+The exact rules, every limit and the result format are in `specs/web-fetch.md`.
 
-### Cache location
+## Using it
 
-The first of these wins: the tool's `cache` parameter, the environment variable
-`PI_DENT_WEB_CACHE_DIR` (read at each call), the `web.cache` setting, else `project`. Each takes
-the same values:
-
-| Value         | Cache folder                                                                                                                         |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `project`     | `<working folder>/.pi/web-cache/`, the default: kept across sessions                                                                 |
-| `session`     | `$PI_DENT_SESSION_DIR/tmp/web-cache/` under pi-dent, else `<system temporary folder>/pi-dent-web-fetch/<session id>/`; never removed |
-| a folder path | that folder; a relative path resolves against the working folder, and `~/` is the home folder                                        |
-
-A folder path that resolves to the working folder itself, the home folder or the filesystem root is
-refused: as the parameter it is an error, from the variable or the setting it is ignored with a
-warning. Entries go in `<folder>/<host>/<slug>-<hash>/`. A `.gitignore` of `*` is written when the
-tool creates the folder (and whenever absent in the `project` and `session` folders); an existing
-one is left alone. Use `./project` or `./session` for a folder of that name.
-
-```jsonc
-{ "web": { "cache": ".cache" } } // <working folder>/.cache/
-```
-
-```jsonc
-{ "web": { "cache": "session" } } // this session's temporary folder
-```
+pi-dent bundles it. Standalone:
 
 ```sh
-PI_DENT_WEB_CACHE_DIR=/abs/dir pi   # one folder for every project
+pi install npm:pi-dent-web-fetch
 ```
 
-## Install
+Settings go under `web` in pi-dent's `pi-dent.conf` (`specs/web-fetch.md`, Configuration); the
+cache location also comes from the `cache` parameter or `PI_DENT_WEB_CACHE_DIR`
+(`specs/web-fetch.md`, Location):
 
-```sh
-pi -e <absolute path of this repository>   # try it for one run
+```jsonc
+{ "web": { "cache": "project", "reformat": true, "reformatModel": "fast" } }
 ```
 
-Requires Node 26 or later, and a pi that provides the extension API
-(`@earendil-works/pi-coding-agent`).
+`project`, the default, caches in `<working folder>/.pi/web-cache/`; `session` uses the session's
+temporary folder; any other value is a folder path.
+
+Requires Node 26 or later.
 
 ## Documentation
 
-- `specs/web-fetch.md` — the `WebFetch` tool.
-- `AGENTS.md` — how to work on the repository.
+- `specs/web-fetch.md`: the `WebFetch` tool, every rule and limit.
+- `AGENTS.md`: how to work on the repository.
 
 ## License
 
