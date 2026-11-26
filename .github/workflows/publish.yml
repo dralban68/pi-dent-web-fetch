@@ -1,0 +1,62 @@
+name: publish
+
+# On every push to main: check, then publish to npm unless package.json's version is already there.
+# Auth: npm trusted publishing (OIDC) once configured on npmjs.com, else the NPM_TOKEN secret
+# (a granular token with "bypass two-factor authentication").
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 26
+          registry-url: https://registry.npmjs.org
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm check
+      - name: Publish unless this version is on npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ "$(node -p 'require("./package.json").private === true')" = true ]; then
+            echo "package.json is private; remove \"private\" to publish"
+            exit 0
+          fi
+          name=$(node -p 'require("./package.json").name')
+          version=$(node -p 'require("./package.json").version')
+          if [ "$(npm view "$name@$version" version --prefer-online 2>/dev/null)" = "$version" ]; then
+            echo "$name@$version is already on npm; bump the version to publish"
+            exit 0
+          fi
+          tarball=$(pnpm pack --pack-destination "$RUNNER_TEMP" | tail -1)
+          # A version staged or published since the check above (a concurrent run, an approved
+          # staged publish) is not a failure of this run.
+          if out=$(npm publish "$tarball" --access public 2>&1); then
+            echo "$out"
+            exit 0
+          fi
+          echo "$out"
+          if grep -q 'previously staged version' <<<"$out"; then
+            echo "::warning::$name@$version is staged on npm and waits for approval: npm stage list $name"
+            exit 0
+          fi
+          if grep -q 'cannot publish over the previously published versions' <<<"$out"; then
+            echo "$name@$version is already on npm"
+            exit 0
+          fi
+          exit 1

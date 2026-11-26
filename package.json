@@ -1,0 +1,60 @@
+{
+  "name": "pi-dent-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A pi extension whose WebFetch tool fetches a web page as Markdown and caches it in the working folder",
+  "keywords": [
+    "markdown",
+    "pi-extension",
+    "pi-package",
+    "web-fetch"
+  ],
+  "homepage": "https://github.com/dralban68/pi-dent-web#readme",
+  "bugs": "https://github.com/dralban68/pi-dent-web/issues",
+  "license": "MIT",
+  "author": "Chris B <dralban68@protonmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dralban68/pi-dent-web.git"
+  },
+  "files": [
+    "index.ts",
+    "lib/"
+  ],
+  "type": "module",
+  "scripts": {
+    "test": "node --test --test-timeout=30000 test/",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint .",
+    "fmt": "oxfmt .",
+    "fmt:check": "oxfmt --check .",
+    "check": "pnpm typecheck && pnpm lint && pnpm fmt:check && pnpm test"
+  },
+  "devDependencies": {
+    "@earendil-works/pi-agent-core": "1.5.2",
+    "@earendil-works/pi-ai": "1.5.2",
+    "@earendil-works/pi-coding-agent": "1.5.2",
+    "@earendil-works/pi-tui": "1.5.2",
+    "@types/node": "^26.6.6",
+    "oxfmt": "^0.77.0",
+    "oxlint": "^1.93.0",
+    "typebox": "1.3.27",
+    "typescript": "^7.0.2"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*",
+    "typebox": "*"
+  },
+  "engines": {
+    "node": ">=26"
+  },
+  "packageManager": "pnpm@12.18.0",
+  "pi": {
+    "extensions": [
+      "./index.ts"
+    ]
+  }
+}

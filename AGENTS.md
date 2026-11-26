@@ -1,0 +1,34 @@
+# pi-dent-web
+
+A pi extension whose `WebFetch` tool fetches a web page as Markdown and caches it in the session's
+working folder. pi-dent bundles it through its `pi.extensions`.
+
+This repository follows the dx repo standard.
+
+## Read first
+
+| Document                                  | Holds, and when to read it                                                      |
+| ----------------------------------------- | ------------------------------------------------------------------------------- |
+| `specs/AGENTS.md`                         | The spec list and this repository's spec conventions — read before any spec     |
+| pi-dent-agent `docs/pi-extension-repo.md` | The pinned pi release, loading and running — read before touching the toolchain |
+
+## Commands
+
+```sh
+pnpm check        # the done-set: typecheck, lint, fmt:check, test
+pnpm test
+pnpm typecheck
+pnpm lint
+pnpm fmt          # rewrites files, Markdown included
+pnpm fmt:check
+pi -ne -e ./      # run pi with only this extension loaded
+```
+
+## Rules
+
+- `index.ts` is wiring only; the tool and its building blocks live in `lib/`.
+- Tests never reach the real internet: HTTP tests use a local `node:http` server through the test
+  seam of `specs/web-fetch.md`.
+- No tracked file holds an absolute home path or the user's name, except the publishing fields of
+  `package.json`; write `<absolute path of …>`. `test/no-personal-paths.test.ts` enforces it.
+- pi-dent-web owns the `WebFetch` tool and the cache directory `.pi/web-cache/`.
