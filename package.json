@@ -18,7 +18,8 @@
   },
   "files": [
     "index.ts",
-    "lib/"
+    "lib/",
+    "specs/"
   ],
   "type": "module",
   "scripts": {
