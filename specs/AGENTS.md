@@ -1,6 +1,6 @@
 # pi-dent-web-fetch specifications
 
-Write and review specs per the `dx:writing-specs` skill, which defines the requirement keywords and
+Write and review specs per the `dev:writing-specs` skill, which defines the requirement keywords and
 the conformance rule. This file holds only this repository's differences from it.
 
 ## Specs
