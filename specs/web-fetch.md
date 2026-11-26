@@ -205,13 +205,14 @@ The entry holds three files, in UTF-8:
 | `extractedSha256` | string         | SHA-256 of `extracted.md`, 64 lowercase hexadecimal digits                                                     |
 | `reformat`        | object or null | null when `content.md` is a copy of `extracted.md`; else the object below                                      |
 
-| `reformat` field | Type   | Value                                                                                                   |
-| ---------------- | ------ | ------------------------------------------------------------------------------------------------------- |
-| `model`          | string | The reformat model string (Section 7.1)                                                                 |
-| `sourceSha256`   | string | `extractedSha256` of the `extracted.md` that was reformatted                                            |
-| `chunks`         | number | Chunk count (Section 7.3)                                                                               |
-| `reformatted`    | number | Chunks that passed the check (Section 7.5)                                                              |
-| `kept`           | object | Chunks kept unreformatted, as a count per reason of Section 7.6; only reasons with a count of 1 or more |
+| `reformat` field | Type   | Value                                                                                                                                                 |
+| ---------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`          | string | The reformat model string (Section 7.1)                                                                                                               |
+| `sourceSha256`   | string | `extractedSha256` of the `extracted.md` that was reformatted                                                                                          |
+| `chunks`         | number | Chunk count (Section 7.3)                                                                                                                             |
+| `reformatted`    | number | Chunks that passed the check (Section 7.5)                                                                                                            |
+| `kept`           | object | Chunks kept unreformatted, as a count per reason of Section 7.6; only reasons with a count of 1 or more                                               |
+| `parts`          | array  | One object per chunk, in order: `result`, `reformatted` or a reason of Section 7.6, and `length`, the characters of that chunk's text in `content.md` |
 
 An entry exists when all three files exist and `meta.json` parses with every field of the stated
 type. Otherwise the tool MUST treat the entry as absent, fetch, replace every file, and add the
@@ -277,17 +278,25 @@ The tool MUST process HTML in this order:
 7. Apply text cleaning (6.4) to the Markdown.
 8. Add the title heading (5.4).
 
-The extension MUST declare `@mozilla/readability`, `linkedom` and `turndown` at exact versions, so
-an install yields the same output for the same input.
+The extension MUST declare `@mozilla/readability`, `linkedom`, `turndown` and
+`@truto/turndown-plugin-gfm` at exact versions, so an install yields the same output for the same
+input.
 
 ### 5.3 Conversion
 
 Conversion uses `turndown` with `headingStyle: "atx"`, `codeBlockStyle: "fenced"`,
 `bulletListMarker: "-"`, `emDelimiter: "_"`, `strongDelimiter: "**"` and `linkStyle: "inlined"`,
-and no `keep` rule. Two rules are added:
+and no `keep` rule, plus the `tables` plugin of `@truto/turndown-plugin-gfm`, so a table becomes a
+GFM table whose first row is the header, with a delimiter row of `---` cells. These rules are
+added and win over the plugin's:
 
 - An `img` becomes its `alt` text, or nothing when `alt` is absent or empty.
+- A table cell becomes `| ` (first cell) or ` `, its content with each white-space run collapsed
+  to one space, ends trimmed and each `|` written `\|`, then ` |`.
 - Every element without another rule becomes its content, so no tag reaches the output.
+
+Before conversion, each `caption` is moved out of its table and placed before it as a `p`, so its
+text is kept.
 
 In text taken from a text node, outside code spans and code blocks, each `<` followed by an ASCII
 letter, `/`, `!` or `?` MUST be written as `\<`. The Markdown MUST contain no HTML tag outside code
@@ -407,27 +416,36 @@ code and URLs, so the model can rearrange formatting but cannot add, drop or cha
 ### 7.1 Request and model
 
 A call requests the reformat when its `reformat` parameter is `true`, or is absent while
-`web.reformat` (Section 8) is `true`. The reformat model string is `web.reformatModel`, trimmed. It
-resolves to the model of `modelRegistry.getAll()` whose `<provider>/<id>` equals the string, with
-no reasoning level; else, when the string ends in `:<level>`, `<level>` being one of `off`,
-`minimal`, `low`, `medium`, `high`, `xhigh` and `max`, to the model whose `<provider>/<id>` equals
-the part before that `:`, with that level. Model classes are not resolved.
+`web.reformat` (Section 8) is `true`. The reformat model string is `web.reformatModel`. It MUST be
+parsed and resolved per [pi-dent model-string], Sections 1 to 4: concrete selectors, class
+references through `modelClasses`, the `fallback` class and the thinking suffix, against the
+inventory `modelRegistry.getAll()` and the `modelClasses` value of the configuration (Section 8).
+Its reasoning level is the resolved thinking level. Each call resolves it anew.
+`modelClasses` diagnostics are pi-dent's; this extension reports none.
 
 When the reformat is requested and cannot run, the tool MUST serve the entry as Section 4 left it
 and add the notice `Reformat skipped: <reason>.`, the reasons being:
 
-| Case                                       | `<reason>`                                             |
-| ------------------------------------------ | ------------------------------------------------------ |
-| `web.reformatModel` absent                 | `no reformat model is configured (web.reformatModel)`  |
-| The string resolves to no model            | `reformat model <string> is not in the model registry` |
-| `hasConfiguredAuth` is false for the model | `reformat model <string> has no configured auth`       |
+| Case                                       | `<reason>`                                                    |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `web.reformatModel` absent                 | `no reformat model is configured (web.reformatModel)`         |
+| Parsing or resolution fails                | `reformat model <string> cannot be resolved: <error message>` |
+| `hasConfiguredAuth` is false for the model | `reformat model <string> has no configured auth`              |
 
 ### 7.2 Reuse
 
-After Section 4 has produced the entry to serve, with any status, a requested reformat is reused,
-with no completion, when the entry's `reformat` has the same `model`, its `sourceSha256` equals
-`extractedSha256`, and its `kept` has neither `model error` nor `timed out`. Otherwise the tool
-MUST reformat `extracted.md` (7.3 to 7.6) without fetching again, then write `content.md` and
+After Section 4 has produced the entry to serve, with any status, a requested reformat compares
+the entry's `reformat` with the reformat model string and `extractedSha256`:
+
+- Same `model` and `sourceSha256`, and no part with result `model error` or `timed out`: the
+  entry is reused, with no completion.
+- Same `model` and `sourceSha256`, the chunks of Section 7.3 as many as `parts`, and some parts
+  with result `model error` or `timed out`: only those chunks are sent again (7.4 to 7.6); every
+  other part keeps its text, cut from `content.md` by the `parts` lengths. A check failure is final
+  for that model and that `extracted.md`.
+- Otherwise every chunk of `extracted.md` is reformatted (7.3 to 7.6).
+
+The reformat uses no network access other than the completions, and then writes `content.md` and
 `meta.json` per Section 4.3. A call that does not request the reformat serves the entry as stored.
 
 ### 7.3 Chunks
@@ -468,9 +486,9 @@ The reduction of a Markdown text is the triple (code list, URL list, text), comp
 1. **Fences.** A line of at most 3 spaces then 3 or more `` ` `` (with no `` ` `` in the rest of the
    line) or 3 or more `~` opens a fence; the next line of at most 3 spaces, a run of the same
    character at least as long, and only spaces after it closes it; an unclosed fence ends at the
-   last line. The lines between, joined by line feeds and compared exactly, white space included,
-   are appended to the code list. The fence lines and the lines between are replaced by one line
-   holding U+0000.
+   last line. The lines between, joined by line feeds, white space included, are the fence's
+   content and are appended to the code list. The fence lines are markup and are removed; the
+   content lines stay and go through steps 2 to 7 like any other line.
 2. **Lines dropped.** A line of `=` runs, `-` runs, `*` runs or `_` runs, with spaces between or
    around them (setext underlines and thematic breaks), and a table delimiter line (`|`, `:`, `-`
    and spaces only, with at least one `-`), are removed.
@@ -491,12 +509,18 @@ The reduction of a Markdown text is the triple (code list, URL list, text), comp
 7. **White space.** Each run of U+0009, U+000A and U+0020 becomes one U+0020, and the ends are
    trimmed.
 
-A chunk passes when the reductions of the chunk and of the processed output (7.4) have equal code
-lists, equal URL lists once each is sorted by UTF-16 code units, and equal texts. The check MUST
+The code lists are matched in order: each output fence, taken in order, is matched to the next
+unmatched input fence when their contents are equal, else it is a new fence. The code check passes
+when every input fence is matched, and the content of every new fence equals, exactly, a run of
+one or more consecutive whole lines of the input chunk (split on line feeds); an empty new fence
+always matches.
+
+A chunk passes when the code check passes, the URL lists of the chunk and of the processed output
+(7.4) are equal once each is sorted by UTF-16 code units, and their texts are equal. The check MUST
 depend on nothing but the two texts.
 
-> Note (non-normative): U+0000 cannot occur in cleaned text, so the marker fixes where each code
-> block sits; adding or removing a fence fails the check, which keeps such a chunk as it was.
+> Note (non-normative): the text check fixes the order of all text, fence contents included, so a
+> new fence can only wrap lines where they stand; removing or changing a fence fails the code check.
 
 ### 7.6 Kept chunks
 
@@ -511,7 +535,7 @@ the first reason that applies, in this order:
 | `model error`   | `streamSimple` threw, or its stop reason is an error or abort |
 | `truncated`     | Its stop reason is the token limit                            |
 | `empty output`  | The processed output is empty                                 |
-| `code changed`  | The code lists differ                                         |
+| `code changed`  | The code check fails                                          |
 | `links changed` | The URL lists differ                                          |
 | `text changed`  | The texts differ                                              |
 
@@ -537,6 +561,10 @@ string` and `<file>: web has unknown keys <keys>`, `<keys>` being the unknown ke
 order joined by `, `, and `<file>` the owning layer's file (pi-dent-agent `specs/config-file.md`,
 Section 4). Each MUST be reported once per extension instance, at that `session_start` when the
 session has a UI, through `notify` at level `warning` as `pi-dent-web: <message>`.
+
+The same read also yields the merged `modelClasses` value, pi-dent's root key ([pi-dent
+model-string], Section 3), used by Section 7.1 only; a value that is not an object counts as
+absent.
 
 ## 9. Result
 
@@ -590,8 +618,11 @@ token, and each character class of Section 6.4), a test MUST serve a page that h
 
 Reformat tests MUST use a stubbed `modelRegistry` and cover at least: a valid reformat accepted;
 added, dropped and reworded text, each rejected with `text changed`; a changed URL rejected with
-`links changed`; a changed line inside a code block rejected with `code changed`; the skip notice
-when `web.reformatModel` is absent; and reuse of a cached reformat with no completion.
+`links changed`; a changed line inside a code block rejected with `code changed`; a valid new
+fence accepted; a new fence that changes its inner text, and a removed fence, each rejected with
+`code changed`; a table from conversion reformatted and accepted; the skip notice when
+`web.reformatModel` is absent; a model class resolved; reuse of a cached reformat with no
+completion; and a retry that sends only the chunks lost to `model error` or `timed out`.
 
 ## 11. Normative references
 
@@ -600,12 +631,17 @@ when `web.reformatModel` is absent; and reuse of a cached reformat with no compl
   15.4 (redirect status codes).
 - [RFC 6890] Special-Purpose IP Address Registries: the ranges of Section 3.4.
 - [Unicode] The Unicode Standard: general categories Cc and Cf, and the White_Space property.
+- [pi-dent model-string] pi-dent-agent `specs/model-string.md`: Sections 1 to 4, the model string
+  grammar, model classes, resolution, `fallback` and thinking precedence.
 
 ## 12. Specification gaps
 
 - Readability's behaviour is fixed by its pinned version, not by this spec; a version bump can
   change extraction output.
-- Tables have no Markdown form in `extracted.md`: their cells become blocks of text.
+- A table cell holding block content (a list, a paragraph, a nested table) is flattened to one
+  line.
+- The `modelClasses` mapping is read at this extension's first `session_start`, not shared with
+  pi-dent's boot snapshot, so after a configuration change the two can differ until reload.
 - A BOM is not considered in character decoding.
 - Two calls for one URL at once both fetch or reformat; the later rename wins per file, so
   `content.md` and `meta.json` can briefly come from different calls.
@@ -613,5 +649,7 @@ when `web.reformatModel` is absent; and reuse of a cached reformat with no compl
 - The reformat model's output differs between runs, so `content.md` is not deterministic;
   `extracted.md` is.
 - The check of Section 7.5 lets the model drop or add the syntax it strips: emphasis characters,
-  list numbers at a line start, `#` runs at a line start, and table pipes.
+  list numbers at a line start, `#` runs at a line start, and table pipes, escaped pipes included.
+- A new fence must copy its lines exactly, escapes included, so a fence that also unescapes code
+  is rejected.
 - The cache is never pruned.
