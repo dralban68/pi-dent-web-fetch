@@ -505,11 +505,19 @@ the call adds the notice `No text found in the PDF; the file is kept.`
 Each page's text comes from its PDF.js `getTextContent()` items. The tool pairs the page's items
 with the runs of the page's operator list (`getOperatorList()`), tracking the graphics state over
 save, restore, transform, form (`paintFormXObjectBegin`, whose argument matrix multiplies the
-current transformation matrix, and `paintFormXObjectEnd`), text matrix, next-line, text rise,
-font size and text render mode operators, to give each show-text run its origin in page space,
-its effective font size (the `Tf` size scaled by the text and transformation matrices) and its
-text render mode. Each non-empty item is paired with the run whose origin equals the item's origin
-within 1 pt; an item that pairs with no run is dropped. An item is dropped when its run has:
+current transformation matrix, and `paintFormXObjectEnd`), begin-text (which resets the text
+matrix), text matrix, next-line, text rise, font size and text render mode operators, to give each
+show-text run its origin in page space, its effective font size (the `Tf` size scaled by the text
+and transformation matrices), its text render mode and its text (the Unicode of its glyphs). A
+`Td`-style move and the text rise are in text space, so the text matrix scales them.
+
+Items and runs are taken in stream order. A non-empty item whose origin equals, within 1 pt, the
+origin of a run not yet passed starts from the first such run; an item that pairs with no run
+continues the run of the item before it, because PDF.js splits one run into several items (an
+item before any paired run takes the first run). Runs passed over between two paired items were
+merged by PDF.js into the earlier item, or dropped by it: the text of each such run that is
+invisible by the rules below is removed from that item, at its last occurrence. An item is dropped
+when its run has:
 
 - a text render mode of 3 (invisible) or 7 (add to clip path only), per [ISO 32000-2], 9.3.1;
 - an effective font size below 1 pt;
@@ -868,7 +876,8 @@ are built by a committed helper in the test tree, not by committed binary files,
 PDF whose extracted text is checked; one PDF hiding `INJECTION-<rule>` in each removable way of
 5.9 (an invisible render mode, a font size below the threshold, a position outside the page box),
 each absent from `extracted.md` and the result; a PDF with no text and a corrupt PDF, each kept
-with its notice; and a multi-page PDF whose `## Page n` sections are checked.
+with its notice; a multi-page PDF whose `## Page n` sections are checked; lines placed by `Td`
+under a scaled `Tm`, one of them hidden; and a hidden run that PDF.js merges into a visible item.
 
 Cache location tests MUST set `env`, `homeDir` and `tmpDir` through the seam of Section 2.2, and
 never write into the real home folder or the root of the system temporary folder. They MUST cover each value form (`project`,
@@ -932,9 +941,11 @@ unrelated line before it.
 - The cache is never pruned, and session cache folders are never removed by this extension.
 - PDF text comes from the document's text layer: pages scanned as images without an OCR layer, or
   text converted to outlines, yield nothing; annotation and form-field text is not extracted.
-- An item that pairs with no operator-list run is dropped (5.9), so a construct the tracking of 5.9
-  does not model loses its text; two runs at nearly one origin can take each other's render mode,
-  size or position.
+- Pairing (5.9) follows PDF.js's item boundaries: an item that pairs with no run inherits the run
+  before it, so a construct the tracking of 5.9 does not model can take a neighbour's visibility;
+  two runs at nearly one origin can take each other's render mode, size or position; a hidden run
+  merged into an item is removed only when its text appears there verbatim, and a hidden run that
+  starts an item takes the visible text merged after it with it.
 - A document longer than 100 pages, or an extraction past the call's time budget, is extracted
   partially, with a notice.
 - SVG and the other media types of the 5.8 map are stored, never decoded, cleaned or previewed.
