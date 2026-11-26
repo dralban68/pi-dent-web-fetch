@@ -1,5 +1,5 @@
 /**
- * The configuration of pi-dent-web (specs/web-fetch.md, Section 8): the root key `web` of
+ * The configuration of pi-dent-web-fetch (specs/web-fetch.md, Section 8): the root key `web` of
  * pi-dent's layered `pi-dent.conf`, read as pi-dent-agent `specs/config-file.md`, Sections 1, 2,
  * 3 and 7 specify, plus the merged `modelClasses` value for Section 7.1. A layer whose read or
  * parse fails is dropped without a diagnostic from this extension: pi-dent reports it.
@@ -26,7 +26,7 @@ export interface WebConfig {
   /** `web.cache`, trimmed, with the file of the layer that set it (Section 4.1). */
   readonly cache?: { readonly value: string; readonly file: string };
   readonly modelClasses?: Readonly<Record<string, unknown>>;
-  /** Each is reported as `pi-dent-web: <message>`. */
+  /** Each is reported as `pi-dent-web-fetch: <message>`. */
   readonly diagnostics: readonly string[];
 }
 

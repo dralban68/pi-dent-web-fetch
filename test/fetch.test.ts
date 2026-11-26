@@ -25,7 +25,7 @@ test("3.3 sends GET with the User-Agent, Accept and Accept-Encoding headers", as
   assert.match(
     req?.headers["user-agent"] ?? "",
     new RegExp(
-      `^pi-dent-web/${VERSION.replaceAll(".", "\\.")} \\(\\+https://github\\.com/.+/pi-dent-web#readme\\)$`,
+      `^pi-dent-web-fetch/${VERSION.replaceAll(".", "\\.")} \\(\\+https://github\\.com/.+/pi-dent-web-fetch#readme\\)$`,
     ),
   );
   assert.equal(req?.headers.accept, "text/markdown, text/html;q=0.9, text/plain;q=0.8");

@@ -65,7 +65,7 @@ export function text(body: string, type = "text/markdown"): Handler {
 }
 
 export async function tempDir(t: TestContext): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), "pi-dent-web-"));
+  const dir = await mkdtemp(join(tmpdir(), "pi-dent-web-fetch-"));
   t.after(() => rm(dir, { recursive: true, force: true }));
   return dir;
 }

@@ -118,7 +118,7 @@ test("4.1 session uses <PI_DENT_SESSION_DIR>/tmp/web-cache when it is set", asyn
   assert.equal(await readFile(join(dir, ".gitignore"), "utf8"), "*\n");
 });
 
-test("4.1 session falls back to <tmpDir>/pi-dent-web/<session id>, with a notice", async (t) => {
+test("4.1 session falls back to <tmpDir>/pi-dent-web-fetch/<session id>, with a notice", async (t) => {
   const d = await dirs(t);
   const url = await serve(t);
   const result = await call(
@@ -126,14 +126,14 @@ test("4.1 session falls back to <tmpDir>/pi-dent-web/<session id>, with a notice
     { url, cache: "session" },
     options(d, { env: { PI_DENT_SESSION_DIR: "  " }, sessionId: "019a/b c" }),
   );
-  const dir = join(d.tmp, "pi-dent-web", "019a_b_c");
+  const dir = join(d.tmp, "pi-dent-web-fetch", "019a_b_c");
   assert.equal(result.details.cacheDir, dir);
   const notice = `PI_DENT_SESSION_DIR is not set; the session cache is ${dir}.`;
   assert.deepEqual(result.details.notices, [notice]);
   assert.ok(resultText(result).split("\n").includes(notice));
   assert.equal(await readFile(join(dir, ".gitignore"), "utf8"), "*\n");
   const empty = await call(d.cwd, { url, cache: "session" }, options(d, { sessionId: "" }));
-  assert.equal(empty.details.cacheDir, join(d.tmp, "pi-dent-web", "unknown"));
+  assert.equal(empty.details.cacheDir, join(d.tmp, "pi-dent-web-fetch", "unknown"));
 });
 
 test("4.1 a refused or empty cache parameter is a tool error, and nothing is written", async (t) => {
@@ -252,7 +252,7 @@ test("4.1 a refused variable warns through notify once per extension instance, o
   const result = await tool.execute("3", { url }, undefined, undefined, ctx(true));
   const root = parse(d.cwd).root;
   const message = `PI_DENT_WEB_CACHE_DIR "/" resolves to the filesystem root (${root}); it is ignored`;
-  assert.deepEqual(notified, [`warning: pi-dent-web: ${message}`]);
+  assert.deepEqual(notified, [`warning: pi-dent-web-fetch: ${message}`]);
   assert.deepEqual(result.details.notices, [`${message}.`]);
 });
 
@@ -281,7 +281,7 @@ test("4.1 a folder path that exists gets no .gitignore; a created one does, and 
 test("4.1 a session cache that exists without a .gitignore gets one", async (t) => {
   const d = await dirs(t);
   const url = await serve(t);
-  const dir = join(d.tmp, "pi-dent-web", "s");
+  const dir = join(d.tmp, "pi-dent-web-fetch", "s");
   await mkdir(dir, { recursive: true });
   await call(d.cwd, { url, cache: "session" }, options(d, { sessionId: "s" }));
   assert.equal(await readFile(join(dir, ".gitignore"), "utf8"), "*\n");

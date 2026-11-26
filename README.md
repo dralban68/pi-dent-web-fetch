@@ -1,4 +1,4 @@
-# pi-dent-web
+# pi-dent-web-fetch
 
 A pi extension whose `WebFetch` tool fetches a web page as Markdown and caches it, by default under
 the session's working folder in `.pi/web-cache/`, so a page fetched once can be read and searched from
@@ -35,11 +35,11 @@ The first of these wins: the tool's `cache` parameter, the environment variable
 `PI_DENT_WEB_CACHE_DIR` (read at each call), the `web.cache` setting, else `project`. Each takes
 the same values:
 
-| Value         | Cache folder                                                                                                                   |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `project`     | `<working folder>/.pi/web-cache/`, the default: kept across sessions                                                           |
-| `session`     | `$PI_DENT_SESSION_DIR/tmp/web-cache/` under pi-dent, else `<system temporary folder>/pi-dent-web/<session id>/`; never removed |
-| a folder path | that folder; a relative path resolves against the working folder, and `~/` is the home folder                                  |
+| Value         | Cache folder                                                                                                                         |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `project`     | `<working folder>/.pi/web-cache/`, the default: kept across sessions                                                                 |
+| `session`     | `$PI_DENT_SESSION_DIR/tmp/web-cache/` under pi-dent, else `<system temporary folder>/pi-dent-web-fetch/<session id>/`; never removed |
+| a folder path | that folder; a relative path resolves against the working folder, and `~/` is the home folder                                        |
 
 A folder path that resolves to the working folder itself, the home folder or the filesystem root is
 refused: as the parameter it is an error, from the variable or the setting it is ignored with a

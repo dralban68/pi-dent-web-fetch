@@ -10,7 +10,7 @@ import type {
   ToolDefinition,
 } from "@earendil-works/pi-coding-agent";
 
-import piDentWeb from "../index.ts";
+import piDentWebFetch from "../index.ts";
 import { layerPaths, loadWebConfig } from "../lib/config.ts";
 import { resolveModelString } from "../lib/model.ts";
 import { reformat } from "../lib/reformat.ts";
@@ -153,13 +153,13 @@ test("2.1 the extension registers WebFetch, and reports configuration diagnostic
   } as unknown as ExtensionAPI;
   const { mkdtemp, mkdir, writeFile, rm } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
-  const dir = await mkdtemp(join(tmpdir(), "pi-dent-web-index-"));
+  const dir = await mkdtemp(join(tmpdir(), "pi-dent-web-fetch-index-"));
   await mkdir(join(dir, ".pi", "pi-dent"), { recursive: true });
   await writeFile(join(dir, ".pi", "pi-dent", "pi-dent.conf"), '{ "web": { "reformat": 1 } }');
   const saved = process.cwd();
   process.chdir(dir);
   try {
-    piDentWeb(pi);
+    piDentWebFetch(pi);
     assert.deepEqual(
       tools.map((tool) => [tool.name, tool.label]),
       [["WebFetch", "Web Fetch"]],
@@ -172,7 +172,7 @@ test("2.1 the extension registers WebFetch, and reports configuration diagnostic
     handlers.get("session_start")?.({ type: "session_start" }, ctx);
     handlers.get("session_start")?.({ type: "session_start" }, ctx);
     assert.deepEqual(notified, [
-      `warning: pi-dent-web: ${join(process.cwd(), ".pi", "pi-dent", "pi-dent.conf")}: web.reformat must be true or false`,
+      `warning: pi-dent-web-fetch: ${join(process.cwd(), ".pi", "pi-dent", "pi-dent.conf")}: web.reformat must be true or false`,
     ]);
   } finally {
     process.chdir(saved);

@@ -1,5 +1,5 @@
 {
-  "name": "pi-dent-web",
+  "name": "pi-dent-web-fetch",
   "version": "0.1.1",
   "description": "A pi extension whose WebFetch tool fetches a web page as Markdown and caches it in the working folder",
   "keywords": [
@@ -8,13 +8,13 @@
     "pi-package",
     "web-fetch"
   ],
-  "homepage": "https://github.com/dralban68/pi-dent-web#readme",
-  "bugs": "https://github.com/dralban68/pi-dent-web/issues",
+  "homepage": "https://github.com/dralban68/pi-dent-web-fetch#readme",
+  "bugs": "https://github.com/dralban68/pi-dent-web-fetch/issues",
   "license": "MIT",
   "author": "Chris B <dralban68@protonmail.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dralban68/pi-dent-web.git"
+    "url": "git+https://github.com/dralban68/pi-dent-web-fetch.git"
   },
   "files": [
     "index.ts",

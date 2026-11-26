@@ -31,7 +31,7 @@ export interface LocationInput {
 
 export interface ChosenLocation extends CacheLocation {
   readonly notices: readonly string[];
-  /** Each is reported as `pi-dent-web: <message>` when the session has a UI. */
+  /** Each is reported as `pi-dent-web-fetch: <message>` when the session has a UI. */
   readonly warnings: readonly string[];
 }
 
@@ -48,7 +48,7 @@ function sessionDirectory(input: LocationInput): Meaning {
     return { dir: join(resolve(input.cwd, sessionDir), "tmp", "web-cache"), owned: true };
   }
   const id = (input.sessionId ?? "").replace(/[^A-Za-z0-9._-]/g, "_");
-  const dir = join(input.tmpDir, "pi-dent-web", id === "" ? "unknown" : id);
+  const dir = join(input.tmpDir, "pi-dent-web-fetch", id === "" ? "unknown" : id);
   return {
     dir,
     owned: true,

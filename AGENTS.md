@@ -1,4 +1,4 @@
-# pi-dent-web
+# pi-dent-web-fetch
 
 A pi extension whose `WebFetch` tool fetches a web page as Markdown and caches it in the session's
 working folder. pi-dent bundles it through its `pi.extensions`.
@@ -31,7 +31,7 @@ pi -ne -e ./      # run pi with only this extension loaded
   seam of `specs/web-fetch.md`.
 - No tracked file holds an absolute home path or the user's name, except the publishing fields of
   `package.json`; write `<absolute path of …>`. `test/no-personal-paths.test.ts` enforces it.
-- pi-dent-web owns the `WebFetch` tool, the default cache directory `.pi/web-cache/`, the
+- pi-dent-web-fetch owns the `WebFetch` tool, the default cache directory `.pi/web-cache/`, the
   `PI_DENT_WEB_CACHE_DIR` variable and the `web` key of `pi-dent.conf`.
 - Published to npm, so `package.json` is not `private`: the one accepted dx audit finding, as in
   pi-dent-terms. pi-dent-agent bundles this package at an exact version.

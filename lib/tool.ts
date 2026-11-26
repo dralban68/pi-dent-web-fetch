@@ -116,7 +116,7 @@ function userAgent(): string {
   );
   const version = isRecord(pkg) && typeof pkg.version === "string" ? pkg.version : "0.0.0";
   const homepage = isRecord(pkg) && typeof pkg.homepage === "string" ? pkg.homepage : "";
-  return `pi-dent-web/${version} (+${homepage})`;
+  return `pi-dent-web-fetch/${version} (+${homepage})`;
 }
 
 const USER_AGENT = userAgent();
@@ -377,7 +377,7 @@ export function createWebFetchTool(
       const warn = (message: string): void => {
         if (!ctx.hasUI || warned.has(message)) return;
         warned.add(message);
-        ctx.ui.notify(`pi-dent-web: ${message}`, "warning");
+        ctx.ui.notify(`pi-dent-web-fetch: ${message}`, "warning");
       };
       const call: CallContext = {
         cwd: ctx.cwd,
