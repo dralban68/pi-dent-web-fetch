@@ -309,8 +309,9 @@ test("7.2 a cached reformat by the same model is reused with no completion", asy
   assert.equal(again.details.reformat?.reformatted, 1);
 });
 
-test("7.2 an unreformatted entry is reformatted from extracted.md without refetching", async (t) => {
+test("7.2 an unreformatted entry is reformatted from its extraction without refetching", async (t) => {
   const { prompts, run } = await fetchMarkdown(t, SOURCE, () => ({ text: VALID }), {
+    reformat: false,
     reformatModel: "stub/fast",
     diagnostics: [],
   });

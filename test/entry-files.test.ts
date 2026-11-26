@@ -102,3 +102,38 @@ test("5.4 a page whose extraction is only its title gets the title-only notice",
     ),
   );
 });
+
+test("7.1 a configured reformat model reformats by default; web.reformat false or the parameter turns it off", async (t) => {
+  const server = await startServer(t);
+  const cwd = await tempDir(t);
+  server.route("/doc", text(SOURCE));
+  const { registry, prompts } = stubRegistry(() => ({ text: VALID }));
+  const modelOnly: WebConfig = { reformatModel: "stub/fast", diagnostics: [] };
+  const on = await call(cwd, { url: `${server.origin}/doc` }, { config: modelOnly, registry });
+  assert.equal(on.details.reformat?.reformatted, 1);
+  assert.deepEqual(await files(cwd, on.details.path), ["content.md", "extracted.md", "meta.json"]);
+  const before = prompts.length;
+  const off: WebConfig = { reformat: false, reformatModel: "stub/fast", diagnostics: [] };
+  const cwd2 = await tempDir(t);
+  const plain = await call(cwd2, { url: `${server.origin}/doc` }, { config: off, registry });
+  assert.equal(plain.details.reformat, null);
+  const param = await call(
+    await tempDir(t),
+    { url: `${server.origin}/doc`, reformat: false },
+    { config: modelOnly, registry },
+  );
+  assert.equal(param.details.reformat, null);
+  assert.equal(prompts.length, before, "no completion when switched off");
+  assert.deepEqual(await files(cwd2, plain.details.path), ["content.md", "meta.json"]);
+});
+
+test("7.1 a reformat whose every chunk is kept leaves no extracted.md", async (t) => {
+  const server = await startServer(t);
+  const cwd = await tempDir(t);
+  server.route("/doc", text(SOURCE));
+  const { registry } = stubRegistry(() => ({ text: "completely different words" }));
+  const result = await call(cwd, { url: `${server.origin}/doc` }, { config: REFORMAT, registry });
+  assert.equal(result.details.reformat?.reformatted, 0);
+  assert.deepEqual(await files(cwd, result.details.path), ["content.md", "meta.json"]);
+  assert.ok(!resultText(result).includes("\nExtracted: "));
+});

@@ -30,7 +30,8 @@ cannot steer the agent into the local network.
   revalidated with its `ETag` or `Last-Modified`; if a refetch fails, the old copy is served as
   `stale`.
 - **Reformat (optional):** a second model fixes the Markdown's structure; a chunk is accepted only
-  when a check proves its text, code and links unchanged.
+  when a check proves its text, code and links unchanged. Setting `web.reformatModel` turns it on
+  for every fetch; `"reformat": false` (setting or parameter) turns it off.
 - **Limits:** 30 s to fetch, PDF extraction included; 10 MiB for text bodies, 50 MiB for stored
   files; 100 PDF pages.
 
@@ -49,7 +50,7 @@ cache location also comes from the `cache` parameter or `PI_DENT_WEB_CACHE_DIR`
 ([web-fetch.md, cache location](specs/web-fetch.md#cache-location)):
 
 ```jsonc
-{ "web": { "cache": "project", "reformat": true, "reformatModel": "fast" } }
+{ "web": { "cache": "project", "reformatModel": "fast" } }
 ```
 
 `project`, the default, caches in `<working folder>/.pi/web-cache/`; `session` uses the session's

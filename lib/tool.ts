@@ -414,7 +414,8 @@ export async function runWebFetch(
   }
 
   let final = served.entry;
-  if (params.reformat ?? config.reformat ?? false) {
+  // specs/web-fetch.md#reformat-model: a configured model reformats unless switched off.
+  if (params.reformat ?? config.reformat ?? config.reformatModel !== undefined) {
     final = await applyReformat(final, config, ctx, location, paths, notices, signal);
   }
   const meta = final.meta;
