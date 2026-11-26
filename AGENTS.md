@@ -28,10 +28,10 @@ pi -ne -e ./      # run pi with only this extension loaded
 
 - `index.ts` is wiring only; the tool and its building blocks live in `lib/`.
 - Tests never reach the real internet: HTTP tests use a local `node:http` server through the test
-  seam of `specs/web-fetch.md`.
+  seam ([web-fetch.md, test seam](specs/web-fetch.md#test-seam)).
 - No tracked file holds an absolute home path or the user's name, except the publishing fields of
   `package.json`; write `<absolute path of …>`. `test/no-personal-paths.test.ts` enforces it.
 - pi-dent-web-fetch owns the `WebFetch` tool, the default cache directory `.pi/web-cache/`, the
   `PI_DENT_WEB_CACHE_DIR` variable and the `web` key of `pi-dent.conf`.
-- Published to npm, so `package.json` is not `private`: the one accepted dev audit finding, as in
-  pi-dent-terms. pi-dent-agent bundles this package at an exact version.
+- Published to npm, so package.json is not private: the one accepted dev audit finding.
+  pi-dent-agent bundles this package at an exact version.
