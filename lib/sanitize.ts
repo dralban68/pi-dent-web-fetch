@@ -39,6 +39,11 @@ export const REMOVED_ELEMENTS: readonly string[] = [
   "base",
   "param",
   "portal",
+  "title",
+  "xmp",
+  "noembed",
+  "noframes",
+  "plaintext",
   "annotation",
   "annotation-xml",
 ];

@@ -9,6 +9,7 @@ import { parseHTML } from "linkedom";
 import TurndownService from "turndown";
 
 import type { ContentKind } from "./decode.ts";
+import { sanitizeMarkdownHtml } from "./markdown-body.ts";
 import { sanitizeDocument } from "./sanitize.ts";
 import { cleanLine, cleanText } from "./text.ts";
 
@@ -29,7 +30,25 @@ function parse(html: string): Document {
   return parseHTML(html).document;
 }
 
-function createConverter(): TurndownService {
+const CELL_DELIMITER = /^(?=.*\|)(?=.*-)[ |:-]*$/;
+
+/** A cell's content on one line: its lines joined with ` · ` (Section 5.3). */
+export function cellText(content: string): string {
+  return content
+    .split("\n")
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter((line) => line !== "" && !CELL_DELIMITER.test(line))
+    .join(" · ")
+    .replace(/(?<!\\)\|/g, "\\|");
+}
+
+/** Placeholders of a Markdown body (Section 5.5): each element `<prefix><n>` gives back `texts[n]`. */
+interface Placeholders {
+  readonly prefix: string;
+  readonly texts: readonly string[];
+}
+
+function createConverter(placeholders?: Placeholders): TurndownService {
   const service = new TurndownService({
     headingStyle: "atx",
     codeBlockStyle: "fenced",
@@ -44,10 +63,18 @@ function createConverter(): TurndownService {
     filter: ["th", "td"],
     replacement(content, node) {
       const first = node.parentNode?.firstElementChild === node;
-      const text = content.replace(/\s+/g, " ").trim().replace(/\|/g, "\\|");
-      return `${first ? "| " : " "}${text.padEnd(3, " ")} |`;
+      return `${first ? "| " : " "}${cellText(content).padEnd(3, " ")} |`;
     },
   });
+  if (placeholders !== undefined) {
+    const upper = placeholders.prefix.toUpperCase();
+    service.addRule("markdownText", {
+      filter: (node) => node.nodeName.startsWith(upper),
+      replacement(_content, node) {
+        return placeholders.texts[Number(node.nodeName.slice(upper.length))] ?? "";
+      },
+    });
+  }
   service.addRule("img", {
     filter: "img",
     replacement(_content, node) {
@@ -77,9 +104,9 @@ function moveCaptions(root: HTMLElement): void {
  * parses it with its own DOM, which implements the table API (`rows`) that its tables plugin
  * needs and linkedom lacks.
  */
-export function toMarkdown(root: HTMLElement): string {
+export function toMarkdown(root: HTMLElement, service: TurndownService = converter): string {
   moveCaptions(root);
-  const markdown = converter.turndown(root.innerHTML).trim();
+  const markdown = service.turndown(root.innerHTML).trim();
   return markdown === "" ? "" : `${markdown}\n`;
 }
 
@@ -138,9 +165,56 @@ export function extractHtml(html: string, finalUrl: string): Extracted {
     sanitizeDocument(fresh, base);
     root = fresh.body ?? fresh.documentElement;
   }
-  const markdown = addHeading(cleanText(toMarkdown(root)), title);
+  const markdown = addHeading(cleanText(dropEmptySections(toMarkdown(root))), title);
   if (markdown.trim() === "") notices.push(NOTICE_EMPTY);
   return { markdown, title, notices };
+}
+
+const HEADING = /^(#{1,6})(?: |$)/;
+
+/** Section 5.6: removes each heading whose section holds only empty and heading lines. */
+export function dropEmptySections(markdown: string): string {
+  const lines = markdown.split("\n");
+  const levels: (number | undefined)[] = [];
+  let fence: RegExp | undefined;
+  for (const line of lines) {
+    if (fence !== undefined) {
+      if (fence.test(line)) fence = undefined;
+      levels.push(undefined);
+      continue;
+    }
+    const open = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/.exec(line)?.[1];
+    if (open !== undefined) fence = new RegExp(`^ {0,3}\\${open.charAt(0)}{${open.length},} *$`);
+    levels.push(HEADING.exec(line)?.[1]?.length);
+  }
+  const removed = new Set<number>();
+  for (const [index, level] of levels.entries()) {
+    if (level === undefined) continue;
+    let content = false;
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const other = levels[next];
+      if (other !== undefined && other <= level) break;
+      if (other === undefined && (lines[next] ?? "").trim() !== "") {
+        content = true;
+        break;
+      }
+    }
+    if (content) continue;
+    removed.add(index);
+    for (
+      let next = index + 1;
+      next < lines.length && (lines[next] ?? "").trim() === "";
+      next += 1
+    ) {
+      removed.add(next);
+    }
+  }
+  if (removed.size === 0) return markdown;
+  const kept = lines
+    .filter((_line, index) => !removed.has(index))
+    .join("\n")
+    .trim();
+  return kept === "" ? "" : `${kept}\n`;
 }
 
 /** The title of a Markdown body: the text after `# ` on the first line starting with it. */
@@ -151,10 +225,19 @@ function markdownTitle(markdown: string): string | null {
   return text === "" ? null : text;
 }
 
+/** Section 5.5: a Markdown body with its embedded HTML sanitized and converted. */
+function markdownBody(text: string, finalUrl: string): string {
+  const sanitized = sanitizeMarkdownHtml(text, finalUrl);
+  if (sanitized === undefined) return text;
+  const root = sanitized.document.body ?? sanitized.document.documentElement;
+  const service = createConverter({ prefix: sanitized.prefix, texts: sanitized.texts });
+  return cleanText(dropEmptySections(toMarkdown(root, service)));
+}
+
 /** Content of any supported kind to the text of `extracted.md`. */
 export function extract(kind: ContentKind, text: string, finalUrl: string): Extracted {
   if (kind === "html") return extractHtml(text, finalUrl);
-  const markdown = cleanText(text);
+  const markdown = kind === "markdown" ? markdownBody(cleanText(text), finalUrl) : cleanText(text);
   const notices = markdown.trim() === "" ? [NOTICE_EMPTY] : [];
   return { markdown, title: kind === "markdown" ? markdownTitle(markdown) : null, notices };
 }

@@ -10,21 +10,10 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { HIDDEN_TOKENS, REMOVED_ELEMENTS } from "../lib/sanitize.ts";
+import { ATTRIBUTE_CASES, STYLE_CASES, VOID } from "./cases.ts";
 import { call, html, resultText, startServer, tempDir } from "./helpers.ts";
 
 const FILLER = `<p>${"Visible prose that every reader of this page can see and read. ".repeat(6)}</p>`;
-const VOID = new Set([
-  "frame",
-  "input",
-  "source",
-  "track",
-  "link",
-  "meta",
-  "base",
-  "param",
-  "area",
-  "embed",
-]);
 
 /** Serves `hidden` inside an article between visible markers; returns the stored and returned texts. */
 async function fetchHidden(t: Parameters<typeof tempDir>[0], hidden: string, head?: string) {
@@ -124,47 +113,10 @@ test("6.1 removes a label inside a form and keeps one outside", async (t) => {
   assert.ok(out.extracted.includes("OUTSIDE-LABEL"));
 });
 
-const ATTRIBUTE_CASES: readonly [string, string][] = [
-  ["hidden", '<span hidden="until-found">INJECTION-hidden</span>'],
-  ["inert", "<span inert>INJECTION-inert</span>"],
-  ["popover", "<span popover>INJECTION-popover</span>"],
-  ["aria-hidden", '<span aria-hidden=" TRUE ">INJECTION-aria-hidden</span>'],
-];
 for (const [rule, hidden] of ATTRIBUTE_CASES) {
   test(`6.2 removes an element with ${rule}`, async (t) => assertHidden(t, rule, hidden));
 }
 
-const STYLE_CASES: readonly [string, string][] = [
-  ["display", "display: none !important"],
-  ["visibility-hidden", "visibility:hidden"],
-  ["visibility-collapse", "VISIBILITY: Collapse"],
-  ["content-visibility", "content-visibility: hidden"],
-  ["opacity", "opacity: 0.05"],
-  ["opacity-percent", "opacity: 5%"],
-  ["font-size-zero", "font-size: 0"],
-  ["font-size-px", "font-size: 0.5px"],
-  ["font-size-em", "font-size: 0.05em"],
-  ["font-size-percent", "font-size: 5%"],
-  ["width", "width: 0; overflow: hidden"],
-  ["height", "height:0px;overflow-y:clip"],
-  ["max-height", "max-height: 0; overflow-x: hidden"],
-  ["clip", "position:absolute; clip: rect(0 0 0 0)"],
-  ["clip-path-inset", "clip-path: inset(50%)"],
-  ["clip-path-circle", "clip-path: circle(0)"],
-  ["transform", "transform: translateX(1px) scale(0)"],
-  ["transform-scaley", "transform: scaleY(0)"],
-  ["scale", "scale: 0"],
-  ["text-indent", "text-indent: -9999px"],
-  ["left", "position: absolute; left: -10000px"],
-  ["top-percent", "position: absolute; top: -100%"],
-  ["margin-left", "margin-left: -999em"],
-  ["color-transparent", "color: transparent"],
-  ["color-rgba", "color: rgba(0, 0, 0, 0)"],
-  ["color-hsl", "color: hsl(0 0% 0% / 0%)"],
-  ["color-hex", "color: #ffffff00"],
-  ["color-hex4", "color: #fff0"],
-  ["later-declaration", "display: block; display: none"],
-];
 for (const [rule, style] of STYLE_CASES) {
   test(`6.2.1 removes an element whose inline style hides it: ${rule}`, async (t) =>
     assertHidden(t, rule, `<span style="${style}">INJECTION-${rule}</span>`));
