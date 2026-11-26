@@ -1,0 +1,352 @@
+/**
+ * The `WebFetch` tool (specs/web-fetch.md): registration (Section 2), the call's flow over the
+ * cache (Section 4), the reformat (Section 7) and the result (Section 9).
+ */
+
+import { readFileSync } from "node:fs";
+
+import type { AgentToolResult, ToolDefinition } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+import { Type } from "typebox";
+
+import {
+  NOTICE_UNREADABLE,
+  KEPT_REASONS,
+  entryPaths,
+  readEntry,
+  serializeMeta,
+  sha256,
+  writeEntry,
+  type Entry,
+  type EntryPaths,
+  type Meta,
+  type ReformatMeta,
+} from "./cache.ts";
+import type { WebConfig } from "./config.ts";
+import { contentKind, decodeBody } from "./decode.ts";
+import { WebFetchError, errorMessage } from "./errors.ts";
+import { extract } from "./extract.ts";
+import { fetchPage, systemResolver, type Resolver } from "./http.ts";
+import { resolveModelString } from "./model.ts";
+import { isReusable, reformat, type Registry } from "./reformat.ts";
+import { canonicalIp } from "./address.ts";
+import { canonicalUrl, validateUrl } from "./url.ts";
+
+export const PREVIEW_CHARS = 4000;
+export const DEFAULT_MAX_AGE_HOURS = 24;
+
+export const WebFetchSchema = Type.Object({
+  url: Type.String({ description: "The http or https page to fetch" }),
+  refresh: Type.Optional(
+    Type.Boolean({ description: "Fetch unconditionally, even when the cached copy is fresh" }),
+  ),
+  maxAgeHours: Type.Optional(
+    Type.Number({ minimum: 0, description: "Freshness limit in hours; default 24" }),
+  ),
+  reformat: Type.Optional(
+    Type.Boolean({
+      description: "Have the reformat model fix the Markdown's formatting; text is never changed",
+    }),
+  ),
+});
+
+export const WEBFETCH_DESCRIPTION =
+  "Fetch a web page (http or https) as Markdown and cache it under .pi/web-cache/ in the working directory. Returns the cache path of content.md, the status (fetched, cached, revalidated, stale) and a preview; read the rest of the page from the path. Text hidden from readers is removed. A fresh cached copy is served without network access.";
+
+export type FetchStatus = "fetched" | "cached" | "revalidated" | "stale";
+
+export interface WebFetchDetails {
+  readonly status: FetchStatus;
+  readonly path: string;
+  readonly extractedPath: string;
+  readonly absolutePath: string;
+  readonly url: string;
+  readonly canonicalUrl: string;
+  readonly finalUrl: string;
+  readonly title: string | null;
+  readonly fetchedAt: string;
+  readonly length: number;
+  readonly previewLength: number;
+  readonly reformat: ReformatMeta | null;
+  readonly notices: readonly string[];
+}
+
+/** The test seam of Section 2.2. */
+export interface WebFetchOptions {
+  readonly resolve?: Resolver;
+  readonly allowedAddresses?: readonly string[];
+}
+
+export interface CallContext {
+  readonly cwd: string;
+  readonly modelRegistry: Registry;
+}
+
+export interface WebFetchParams {
+  readonly url: string;
+  readonly refresh?: boolean | undefined;
+  readonly maxAgeHours?: number | undefined;
+  readonly reformat?: boolean | undefined;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function userAgent(): string {
+  const pkg: unknown = JSON.parse(
+    readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+  );
+  const version = isRecord(pkg) && typeof pkg.version === "string" ? pkg.version : "0.0.0";
+  const homepage = isRecord(pkg) && typeof pkg.homepage === "string" ? pkg.homepage : "";
+  return `pi-dent-web/${version} (+${homepage})`;
+}
+
+const USER_AGENT = userAgent();
+
+/** Section 9.1: the preview, not splitting a surrogate pair. */
+function preview(content: string): string {
+  if (content.length <= PREVIEW_CHARS) return content;
+  const code = content.charCodeAt(PREVIEW_CHARS - 1);
+  const end = code >= 0xd800 && code <= 0xdbff ? PREVIEW_CHARS - 1 : PREVIEW_CHARS;
+  return content.slice(0, end);
+}
+
+/** Section 9.1: the `Reformat:` state. */
+export function reformatState(meta: ReformatMeta | null): string {
+  if (meta === null) return "none";
+  const head = `${meta.model}: ${meta.reformatted} of ${meta.chunks} chunks reformatted`;
+  const kept = KEPT_REASONS.flatMap((reason) => {
+    const count = meta.kept[reason];
+    return count === undefined ? [] : [`${reason} ${count}`];
+  });
+  const total = meta.chunks - meta.reformatted;
+  return kept.length === 0 ? head : `${head}; ${total} kept: ${kept.join(", ")}`;
+}
+
+function resultText(details: WebFetchDetails, content: string, shown: string): string {
+  const lines = [
+    `WebFetch: ${details.status}`,
+    `Path: ${details.path}`,
+    `Absolute path: ${details.absolutePath}`,
+    `Extracted: ${details.extractedPath}`,
+    `Title: ${details.title ?? "(none)"}`,
+    `URL: ${details.finalUrl}`,
+    `Fetched at: ${details.fetchedAt}`,
+    `Length: ${content.length} characters`,
+    `Reformat: ${reformatState(details.reformat)}`,
+    ...details.notices,
+    "",
+    shown,
+  ];
+  const remaining = content.length - shown.length;
+  if (remaining > 0)
+    lines.push(`[${remaining} more characters; read the rest from ${details.path}]`);
+  return lines.join("\n");
+}
+
+interface Served {
+  readonly entry: Entry;
+  readonly status: FetchStatus;
+}
+
+async function fetchAndStore(
+  params: WebFetchParams,
+  canonical: string,
+  paths: EntryPaths,
+  previous: Entry | undefined,
+  cwd: string,
+  notices: string[],
+  signal: AbortSignal | undefined,
+  options: WebFetchOptions,
+): Promise<Served> {
+  const response = await fetchPage({
+    url: canonical,
+    userAgent: USER_AGENT,
+    validators: params.refresh === true ? undefined : previous?.meta,
+    signal,
+    resolve: options.resolve ?? systemResolver,
+    allowedAddresses: new Set((options.allowedAddresses ?? []).map(canonicalIp)),
+  });
+  const now = new Date().toISOString();
+  if (response.status === 304 && previous !== undefined) {
+    const meta: Meta = { ...previous.meta, fetchedAt: now };
+    await writeEntry(cwd, paths, [[paths.meta, serializeMeta(meta)]]);
+    return { entry: { ...previous, meta }, status: "revalidated" };
+  }
+  const kind = contentKind(response.contentType, response.finalUrl);
+  const decoded = decodeBody(response.body, response.contentType, kind);
+  if (decoded.notice !== undefined) notices.push(decoded.notice);
+  const result = extract(kind, decoded.text, response.finalUrl);
+  notices.push(...result.notices);
+  const meta: Meta = {
+    url: params.url,
+    canonicalUrl: canonical,
+    finalUrl: response.finalUrl,
+    fetchedAt: now,
+    status: response.status,
+    contentType: response.contentType ?? "",
+    etag: response.etag,
+    lastModified: response.lastModified,
+    title: result.title,
+    bytes: response.body.length,
+    extractedSha256: sha256(result.markdown),
+    reformat: null,
+  };
+  await writeEntry(cwd, paths, [
+    [paths.extracted, result.markdown],
+    [paths.content, result.markdown],
+    [paths.meta, serializeMeta(meta)],
+  ]);
+  return {
+    entry: { meta, extracted: result.markdown, content: result.markdown },
+    status: "fetched",
+  };
+}
+
+/** Section 7.1 and 7.2: the reformat of the served entry, or a skip notice. */
+async function applyReformat(
+  served: Entry,
+  config: WebConfig,
+  ctx: CallContext,
+  paths: EntryPaths,
+  notices: string[],
+  signal: AbortSignal | undefined,
+): Promise<Entry> {
+  const modelString = config.reformatModel;
+  if (modelString === undefined) {
+    notices.push("Reformat skipped: no reformat model is configured (web.reformatModel).");
+    return served;
+  }
+  let resolved;
+  try {
+    resolved = resolveModelString(modelString, ctx.modelRegistry.getAll(), config.modelClasses);
+  } catch (error) {
+    notices.push(
+      `Reformat skipped: reformat model ${modelString} cannot be resolved: ${errorMessage(error)}.`,
+    );
+    return served;
+  }
+  if (!ctx.modelRegistry.hasConfiguredAuth(resolved.model)) {
+    notices.push(`Reformat skipped: reformat model ${modelString} has no configured auth.`);
+    return served;
+  }
+  const { meta } = served;
+  if (isReusable(meta.reformat, modelString, meta.extractedSha256)) return served;
+  const result = await reformat({
+    registry: ctx.modelRegistry,
+    model: resolved.model,
+    thinking: resolved.thinking,
+    modelString,
+    extracted: served.extracted,
+    extractedSha256: meta.extractedSha256,
+    previous: meta.reformat === null ? undefined : { meta: meta.reformat, content: served.content },
+    signal,
+  });
+  const next: Meta = { ...meta, reformat: result.meta };
+  await writeEntry(ctx.cwd, paths, [
+    [paths.content, result.content],
+    [paths.meta, serializeMeta(next)],
+  ]);
+  return { meta: next, extracted: served.extracted, content: result.content };
+}
+
+/** One call of the tool (Sections 3 to 9). */
+export async function runWebFetch(
+  params: WebFetchParams,
+  ctx: CallContext,
+  config: WebConfig,
+  signal: AbortSignal | undefined,
+  options: WebFetchOptions = {},
+): Promise<AgentToolResult<WebFetchDetails>> {
+  const maxAgeHours = params.maxAgeHours ?? DEFAULT_MAX_AGE_HOURS;
+  if (!Number.isFinite(maxAgeHours) || maxAgeHours < 0) {
+    throw new WebFetchError("input", "WebFetch: maxAgeHours must be a number of 0 or more");
+  }
+  const url = validateUrl(params.url);
+  const canonical = canonicalUrl(url);
+  const paths = entryPaths(ctx.cwd, canonical);
+  const notices: string[] = [];
+  const read = await readEntry(paths);
+  if (read === "unreadable") notices.push(NOTICE_UNREADABLE);
+  const entry = typeof read === "string" ? undefined : read;
+
+  let served: Served;
+  const age = entry === undefined ? Number.NaN : Date.now() - Date.parse(entry.meta.fetchedAt);
+  if (entry !== undefined && params.refresh !== true && age < maxAgeHours * 3_600_000) {
+    served = { entry, status: "cached" };
+  } else {
+    try {
+      served = await fetchAndStore(
+        params,
+        canonical,
+        paths,
+        entry,
+        ctx.cwd,
+        notices,
+        signal,
+        options,
+      );
+    } catch (error) {
+      if (entry === undefined || !(error instanceof WebFetchError) || error.kind !== "fetch") {
+        throw error;
+      }
+      notices.push(
+        `Refetch failed (${error.message}); serving the copy fetched at ${entry.meta.fetchedAt}.`,
+      );
+      served = { entry, status: "stale" };
+    }
+  }
+
+  let final = served.entry;
+  if (params.reformat ?? config.reformat ?? false) {
+    final = await applyReformat(final, config, ctx, paths, notices, signal);
+  }
+  const shown = preview(final.content);
+  const details: WebFetchDetails = {
+    status: served.status,
+    path: paths.relativeContent,
+    extractedPath: paths.relativeExtracted,
+    absolutePath: paths.content,
+    url: params.url,
+    canonicalUrl: canonical,
+    finalUrl: final.meta.finalUrl,
+    title: final.meta.title,
+    fetchedAt: final.meta.fetchedAt,
+    length: final.content.length,
+    previewLength: shown.length,
+    reformat: final.meta.reformat,
+    notices,
+  };
+  return { content: [{ type: "text", text: resultText(details, final.content, shown) }], details };
+}
+
+function isDetails(value: unknown): value is WebFetchDetails {
+  return isRecord(value) && typeof value.status === "string" && typeof value.path === "string";
+}
+
+/** Builds the tool (Section 2.2); `config` returns the configuration read per Section 8. */
+export function createWebFetchTool(
+  config: () => WebConfig,
+  options: WebFetchOptions = {},
+): ToolDefinition<typeof WebFetchSchema, WebFetchDetails> {
+  return {
+    name: "WebFetch",
+    label: "Web Fetch",
+    description: WEBFETCH_DESCRIPTION,
+    promptSnippet: "Fetch a web page as Markdown, cached in the working folder",
+    parameters: WebFetchSchema,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      return runWebFetch(params, ctx, config(), signal, options);
+    },
+    renderCall(args) {
+      return new Text(`WebFetch ${args.url}`, 0, 0);
+    },
+    renderResult(result) {
+      const details = result.details;
+      if (isDetails(details)) return new Text(`${details.status} ${details.path}`, 0, 0);
+      const first = result.content[0];
+      return new Text(first !== undefined && first.type === "text" ? first.text : "", 0, 0);
+    },
+  };
+}
