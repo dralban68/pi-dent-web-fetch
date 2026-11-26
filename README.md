@@ -2,7 +2,9 @@
 
 A pi extension whose `WebFetch` tool fetches a web page as Markdown and caches it under the
 session's working folder, in `.pi/web-cache/`, so a page fetched once can be read and searched from
-disk by later turns and sessions. pi-dent bundles it through its `pi.extensions`.
+disk by later turns and sessions. A sanitizer keeps text a reader would not see out of the result,
+and an optional second model can fix the Markdown's formatting, accepted only where a check proves
+the text unchanged. pi-dent bundles it through its `pi.extensions`.
 
 Status: specified in `specs/web-fetch.md`, not yet implemented.
 
