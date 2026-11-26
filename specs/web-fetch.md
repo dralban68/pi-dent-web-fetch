@@ -5,7 +5,7 @@
 This spec defines the `WebFetch` tool that the pi-dent-web extension registers: how it fetches an
 http or https URL, the network guard, the sanitizer that keeps hidden text out of the result, the
 conversion to Markdown, the optional reformat by a second model with its exact-content check, the
-cache under the session's working directory, its configuration, and the tool result.
+cache and its location, the configuration, and the tool result.
 
 Host API relied on: an extension registers a tool with a `name`, `label`, `description`, a
 parameter schema and an `execute` function. `execute` receives the validated parameters, an abort
@@ -17,7 +17,9 @@ reason). A model has a `provider`, an `id` and `maxTokens`, its output limit in 
 returns `content` (text parts for the model) and `details` (structured data). An error thrown by
 `execute` reaches the model as a tool error carrying the error's message. Optional `renderCall` and
 `renderResult` functions draw the call and its result in the UI. The host fires `session_start`
-when a session starts, and its `notify` API shows a message at a level in the UI.
+when a session starts, and its `notify` API shows a message at a level in the UI. The context of a
+call also says whether the session has a UI (`hasUI`), gives the `notify` API, and gives the
+session's id through `sessionManager.getSessionId()`.
 
 In this spec, cwd means the context's `cwd` of the call.
 
@@ -33,25 +35,31 @@ The extension MUST register exactly one tool, with `name` `WebFetch` and `label`
 | `refresh`     | boolean | no       | `false`                                  | Fetch unconditionally, even when fresh (4.4)            |
 | `maxAgeHours` | number  | no       | `24`                                     | Freshness limit in hours, minimum 0 (inclusive)         |
 | `reformat`    | boolean | no       | `web.reformat` (Section 8), else `false` | Reformat the Markdown by the reformat model (Section 7) |
+| `cache`       | string  | no       | Section 4.1                              | The cache location (Section 4.1)                        |
 
 The schema MUST declare `minimum: 0` for `maxAgeHours`; the tool MUST also refuse a negative or
 non-finite `maxAgeHours` with the tool error `WebFetch: maxAgeHours must be a number of 0 or more`.
 
 ### 2.2 Test seam
 
-The library MUST provide a factory that builds the tool from two options:
+The library MUST provide a factory that builds the tool from these options:
 
 | Option             | Type                                            | Default                                        |
 | ------------------ | ----------------------------------------------- | ---------------------------------------------- |
 | `resolve`          | `(hostname) => Promise<string[]>` of IP strings | the system resolver, every address of the name |
 | `allowedAddresses` | `readonly string[]` of IP strings               | empty                                          |
+| `env`              | a map of environment variable names to values   | the process environment, read at each call     |
+| `homeDir`          | string, an absolute path                        | the user's home folder (`os.homedir()`)        |
+| `tmpDir`           | string, an absolute path                        | the system temporary folder (`os.tmpdir()`)    |
 
 An address in `allowedAddresses`, compared after normalisation to its canonical text form, is
-exempt from Section 3.4. `index.ts` MUST call the factory with neither option, and the extension
-MUST NOT set either option from a tool parameter, an environment variable or a configuration key.
+exempt from Section 3.4. `env`, `homeDir` and `tmpDir` are the environment, home folder and
+temporary folder of Section 4.1. `index.ts` MUST call the factory with no option, and the extension
+MUST NOT set any option from a tool parameter, an environment variable or a configuration key.
 
 > Note (non-normative): tests serve pages from a loopback `node:http` server, which the guard would
-> refuse; the seam lets them allow exactly that address and fake DNS answers.
+> refuse; the seam lets them allow exactly that address and fake DNS answers, and keeps the cache
+> location tests out of the real home and temporary folders.
 
 ## 3. Request
 
@@ -167,10 +175,59 @@ and adds the notice `Unknown charset <label>; decoded as UTF-8.` (Section 9.1).
 
 ### 4.1 Location
 
-The cache directory is `<cwd>/.pi/web-cache/`, created with its parents when absent. Before
-writing an entry, the tool MUST create `<cwd>/.pi/web-cache/.gitignore` with the content `*` and a
-line feed when that file does not exist, and MUST NOT change it when it does. The tool MUST NOT
-read or change any other `.gitignore`.
+Each call uses one cache directory, chosen once per call before the cache is read, and reads and
+writes entries in it only.
+
+A location value is a string, trimmed of white space at both ends. It comes from the first of these
+sources that gives one, in this order:
+
+1. The `cache` parameter, when present.
+2. The environment variable `PI_DENT_WEB_CACHE_DIR` of `env` (2.2), when set and not empty after
+   trimming. It is read at each call.
+3. The `web.cache` setting (Section 8), when present and valid there.
+4. Otherwise the value `project`.
+
+A value means, compared case-sensitively:
+
+| Value         | Cache directory                                                                                 |
+| ------------- | ----------------------------------------------------------------------------------------------- |
+| `project`     | `<cwd>/.pi/web-cache/`                                                                          |
+| `session`     | `<PI_DENT_SESSION_DIR>/tmp/web-cache/` when `PI_DENT_SESSION_DIR` of `env` is set and not empty |
+| `session`     | otherwise `<tmpDir>/pi-dent-web/<session id>/`, and the call adds the notice below              |
+| any other one | a folder path: `~` or a leading `~/` expanded to `homeDir`, then resolved against cwd           |
+
+`<PI_DENT_SESSION_DIR>` is resolved against cwd. `<session id>` is the call's
+`sessionManager.getSessionId()`, each character outside `A-Z`, `a-z`, `0-9`, `.`, `_` and `-`
+replaced by `_`, and `unknown` when that leaves it empty. The notice is
+`PI_DENT_SESSION_DIR is not set; the session cache is <directory>.`
+
+A folder path is refused when it holds U+0000, or when the resolved path, compared as text after
+resolution, is cwd, `homeDir` or the filesystem root. The problem is
+`"<value>" is not a folder path` for U+0000, else `"<value>" resolves to <kind> (<path>)`, `<kind>`
+being `the working folder`, `the home folder` or `the filesystem root`.
+
+- A refused `cache` parameter, or one that is empty after trimming, is the tool error
+  `WebFetch: cache <problem>; give "project", "session" or a folder of its own`, `<problem>` being
+  `is empty` for an empty value. It is raised after the URL checks of Section 3.1 and before the
+  cache is read.
+- A refused value from the variable or the setting is skipped, and the next source is used. The
+  call adds the notice `<source> <problem>; it is ignored.`, where `<source>` is
+  `PI_DENT_WEB_CACHE_DIR` or `<file>: web.cache`, `<file>` as in Section 8. When the call's context
+  has a UI, the tool MUST also report `pi-dent-web: <source> <problem>; it is ignored` through
+  `notify` at level `warning`, once per distinct message per extension instance.
+
+The cache directory is created with its parents when absent. Before writing an entry, the tool MUST
+create `.gitignore` in the cache directory with the content `*` and a line feed:
+
+- for `project` and `session`, when that file does not exist;
+- for a folder path, only when the call created the cache directory itself.
+
+The tool MUST NOT change an existing `.gitignore`, nor read or change any other one. It never
+removes a cache directory or an entry.
+
+A path is under cwd when its path relative to cwd is not empty, does not start with a `..`
+segment and is not absolute. The display path of a file is its path relative to cwd, with `/`
+separators, when it is under cwd, else its absolute path.
 
 ### 4.2 Entry layout
 
@@ -599,16 +656,18 @@ This specification contributes the root key `web` to pi-dent's configuration fil
 | `web`               | object, optional  | The settings of this extension                        |
 | `web.reformat`      | boolean, optional | The default of the `reformat` parameter (Section 2.1) |
 | `web.reformatModel` | string, optional  | The reformat model string (Section 7.1)               |
+| `web.cache`         | string, optional  | The cache location value (Section 4.1)                |
 
 The extension MUST read the configuration as pi-dent-agent `specs/config-file.md`, Sections 1, 2,
 3 and 7, specify it, once per extension instance, at its first `session_start`, or at its first
 call when no `session_start` came before; a layer those sections drop is dropped without a
 diagnostic from this extension. A `web` value that is not an object, a `web.reformat` that is not
-a boolean, and a `web.reformatModel` that is not a non-empty string after trimming MUST each
-produce one diagnostic and be ignored. The diagnostics are `<file>: web must be an object`,
-`<file>: web.reformat must be true or false`, `<file>: web.reformatModel must be a non-empty
-string` and `<file>: web has unknown keys <keys>`, `<keys>` being the unknown keys in ascending
-order joined by `, `, and `<file>` the owning layer's file (pi-dent-agent `specs/config-file.md`,
+a boolean, and a `web.reformatModel` or `web.cache` that is not a non-empty string after trimming
+MUST each produce one diagnostic and be ignored. The diagnostics are `<file>: web must be an
+object`, `<file>: web.reformat must be true or false`, `<file>: web.reformatModel must be a
+non-empty string`, `<file>: web.cache must be a non-empty string` and
+`<file>: web has unknown keys <keys>`, `<keys>` being the unknown keys in ascending order joined
+by `, `, and `<file>` the owning layer's file (pi-dent-agent `specs/config-file.md`,
 Section 4). Each MUST be reported once per extension instance, at that `session_start` when the
 session has a UI, through `notify` at level `warning` as `pi-dent-web: <message>`.
 
@@ -626,7 +685,7 @@ The result's one text part is, line by line, the optional lines included only wh
 WebFetch: <status>
 Path: <path of content.md relative to cwd, with / separators>
 Absolute path: <absolute path of content.md>
-Extracted: <path of extracted.md relative to cwd, with / separators>
+Extracted: <display path of extracted.md>
 Title: <title, or (none)>
 URL: <final URL>
 Fetched at: <fetchedAt>
@@ -635,8 +694,10 @@ Reformat: <reformat state>
 <each notice, one per line, in the order raised>
 
 <preview>
-[<remaining> more characters; read the rest from <path of content.md relative to cwd>]
+[<remaining> more characters; read the rest from <display path of content.md>]
 ```
+
+The `Path:` line is present only when `content.md` is under cwd (4.1).
 
 `<status>` is `fetched`, `cached`, `revalidated` or `stale`. `<reformat state>` is `none` when the
 entry's `reformat` is null, else `<model>: <reformatted> of <chunks> chunks reformatted`, followed,
@@ -648,8 +709,9 @@ sentence the tool adds to state a fallback or a recovered problem.
 
 ### 9.2 Details
 
-`details` is an object with `status`, `path` and `extractedPath` (relative), `absolutePath`, `url`,
-`canonicalUrl`, `finalUrl`, `title` (string or null), `fetchedAt`, `length` (number),
+`details` is an object with `status`, `path` and `extractedPath` (the display paths of
+`content.md` and `extracted.md`, 4.1), `absolutePath`, `cacheDir` (the absolute cache directory),
+`url`, `canonicalUrl`, `finalUrl`, `title` (string or null), `fetchedAt`, `length` (number),
 `previewLength` (number), `reformat` (the entry's `reformat`, Section 4.2) and `notices` (array of
 the notice strings).
 
@@ -670,6 +732,14 @@ HTML block and inline, including an unclosed element and Markdown text between a
 and with a code span and a fenced code block holding `<div hidden>`, which MUST be kept verbatim.
 A plain-text body MUST be tested with a hidden `div`, an HTML comment, a `script` and a hidden-class
 token, and with a fenced code block holding `<div hidden>` kept verbatim.
+
+Cache location tests MUST set `env`, `homeDir` and `tmpDir` through the seam of Section 2.2, and
+never write into the real home folder or the root of the system temporary folder. They MUST cover each value form (`project`,
+`session` with and without `PI_DENT_SESSION_DIR`, a relative, an absolute and a `~/` folder path),
+each refused path, the order of the four sources, the notice and warning for a refused variable
+and setting, the tool error for a refused parameter, `.gitignore` in each new location, and the
+result's path lines for a cache under cwd and outside it.
+
 Tests MUST cover an empty section removed (a heading followed only by the next heading), a
 heading kept because its subsection holds content, and a table cell holding a list and one holding
 a nested table.
@@ -720,4 +790,7 @@ unrelated line before it.
 - Setext headings are not sections for Section 5.6.
 - Query parameters are re-serialised as `application/x-www-form-urlencoded`, so a canonical URL
   can differ in encoding from the given one (`%20` becomes `+`, `?a` becomes `?a=`).
-- The cache is never pruned.
+- The cache is never pruned, and session cache folders are never removed by this extension.
+- The refusal of Section 4.1 compares resolved paths as text: a symbolic link to cwd, the home
+  folder or the root, or a path differing only in letter case on a case-insensitive file system, is
+  not refused.
