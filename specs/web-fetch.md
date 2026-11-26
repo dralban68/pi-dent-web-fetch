@@ -250,13 +250,16 @@ One entry per canonical URL, in the directory `<host>/<slug>-<hash>/` under the 
   again; `index` when empty.
 - `<hash>`: the first 8 hexadecimal digits, lowercase, of the SHA-256 of the canonical URL in UTF-8.
 
-The entry holds three files in UTF-8, plus the stored file of [stored files](#stored-files) (`file.<ext>`, raw bytes)
-when the entry stores one ([stored files](#stored-files), [PDF](#pdf)):
+The extraction is the output of [content](#content), empty when the entry stores a file without text.
+The entry holds these files, the first three in UTF-8:
 
-- `extracted.md`: the output of [content](#content). Empty when the entry stores a file without text.
-- `content.md`: the served file; the output of [reformat](#reformat) when the entry is reformatted, else a copy
-  of `extracted.md`.
-- `meta.json`, a JSON object:
+- `content.md`: the served file; the output of [reformat](#reformat) when the entry is reformatted, else the
+  extraction.
+- `extracted.md`: the extraction, present only when it differs from `content.md`. An entry never
+  holds two files with the same text; where `extracted.md` is absent, `content.md` is the
+  extraction.
+- `meta.json`, a JSON object (below).
+- the stored file (`file.<ext>`, raw bytes) when the entry stores one ([stored files](#stored-files), [PDF](#pdf)).
 
 | Field             | Type           | Value                                                                                                          |
 | ----------------- | -------------- | -------------------------------------------------------------------------------------------------------------- |
@@ -264,7 +267,7 @@ when the entry stores one ([stored files](#stored-files), [PDF](#pdf)):
 | `canonicalUrl`    | string         | [canonical URL](#canonical-url)                                                                                |
 | `finalUrl`        | string         | [redirects](#redirects)                                                                                        |
 | `fetchedAt`       | string         | Time of the last successful fetch or revalidation, ISO 8601 UTC with milliseconds (`YYYY-MM-DDTHH:mm:ss.sssZ`) |
-| `status`          | number         | Final HTTP status of the fetch that produced `extracted.md`                                                    |
+| `status`          | number         | Final HTTP status of the fetch that produced the extraction                                                    |
 | `contentType`     | string         | That response's `Content-Type` value as received                                                               |
 | `etag`            | string or null | That response's `ETag`                                                                                         |
 | `lastModified`    | string or null | That response's `Last-Modified`                                                                                |
@@ -272,20 +275,21 @@ when the entry stores one ([stored files](#stored-files), [PDF](#pdf)):
 | `bytes`           | number         | Body size per [timeout, cancellation and size cap](#timeout-and-cap)                                           |
 | `fileName`        | string or null | The stored file's name (`file.<ext>`, [stored files](#stored-files)), null when the entry stores no file       |
 | `fileBytes`       | number or null | The stored file's size in bytes, null when the entry stores no file                                            |
-| `extractedSha256` | string         | SHA-256 of `extracted.md`, 64 lowercase hexadecimal digits                                                     |
-| `reformat`        | object or null | null when `content.md` is a copy of `extracted.md`; else the object below                                      |
+| `extractedSha256` | string         | SHA-256 of the extraction, 64 lowercase hexadecimal digits                                                     |
+| `reformat`        | object or null | null when `content.md` is the extraction; else the object below                                                |
 
 | `reformat` field | Type   | Value                                                                                                                                                                 |
 | ---------------- | ------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `model`          | string | The reformat model string ([request and model](#reformat-model))                                                                                                      |
-| `sourceSha256`   | string | `extractedSha256` of the `extracted.md` that was reformatted                                                                                                          |
+| `sourceSha256`   | string | `extractedSha256` of the extraction that was reformatted                                                                                                              |
 | `chunks`         | number | Chunk count ([chunks](#chunks))                                                                                                                                       |
 | `reformatted`    | number | Chunks that passed the check ([exact-content check](#exact-content-check))                                                                                            |
 | `kept`           | object | Chunks kept unreformatted, as a count per reason of [kept chunks](#kept-chunks); only reasons with a count of 1 or more                                               |
 | `parts`          | array  | One object per chunk, in order: `result`, `reformatted` or a reason of [kept chunks](#kept-chunks), and `length`, the characters of that chunk's text in `content.md` |
 
-An entry exists when each of its files exists (`meta.json`, `extracted.md`, `content.md`, and the
-stored file when `fileName` is set) and `meta.json` parses with every field of the stated type;
+An entry exists when `meta.json` and `content.md` exist, the stored file exists when `fileName` is
+set, `meta.json` parses with every field of the stated type, and, when `extracted.md` is absent,
+the SHA-256 of `content.md` equals `extractedSha256`;
 `fileName` and `fileBytes` may also both be absent, for an entry written by an older version.
 Otherwise the tool MUST treat the entry as absent, fetch, replace every file, and add the notice
 `The cache entry was unreadable and has been replaced.`
@@ -295,6 +299,10 @@ Otherwise the tool MUST treat the entry as absent, fetch, replace every file, an
 Each file MUST be written to a temporary file in the entry directory whose name starts with `.`
 and ends in `.tmp`, then renamed onto its final name, in the order `file.<ext>` when stored,
 `extracted.md`, `content.md`, `meta.json`; a file whose content does not change is not rewritten.
+`extracted.md` is written only when the extraction differs from the `content.md` being written,
+and a present `extracted.md` is removed, after `meta.json` is written, when it would equal
+`content.md`; an entry written by an older version loses its duplicate `extracted.md` the next
+time the tool writes it.
 The stored file is written as bytes, the others as UTF-8 text. A reader never sees a partly
 written file. A fetch writes the entry before any reformat starts; a reformat then writes
 `content.md` and `meta.json` again. A failed write is the tool error
@@ -401,7 +409,9 @@ When the HTML title is not null and the first non-empty line of the Markdown doe
 `# `, the tool MUST prepend `# <title>` and an empty line, the title escaped as turndown escapes
 text, with the `\<` rule of [conversion](#conversion).
 
-When `extracted.md` is empty, the tool adds the notice `The page produced no text.`
+When the extraction is empty, the tool adds the notice `The page produced no text.` When it holds
+only the title heading, the tool adds the notice
+`The page produced no text beyond its title; it may be rendered by a script.`
 
 ### 5.5 Markdown and plain-text bodies {#markdown-bodies}
 
@@ -438,7 +448,7 @@ removed, with the empty lines after it. A heading whose subsection holds content
 
 A body of `application/json`, of any type ending `+json`, of `text/csv`, `text/xml`,
 `application/xml`, `application/rss+xml` or `application/atom+xml` is data text. It is decoded
-([character decoding](#character-decoding)), text-cleaned ([text cleaning](#text-cleaning)), and stored as `extracted.md` as it stands: it is not parsed as
+([character decoding](#character-decoding)), text-cleaned ([text cleaning](#text-cleaning)), and kept as it stands: it is not parsed as
 Markdown, its HTML-like constructs are not sanitized ([Markdown and plain-text bodies](#markdown-bodies) does not apply), it has no title, and
 no sections are removed. The result previews it like any text.
 
@@ -473,7 +483,7 @@ the URL's file name beyond its extension are never used for the path and never r
 or the result. `meta.json` records the stored name in `fileName` and its size in bytes in
 `fileBytes`; `bytes` ([timeout, cancellation and size cap](#timeout-and-cap)) and `fileBytes` are then equal. The body never enters the model
 context: the result names the file, its media type, its size and the status ([text](#result-text)). The notice of
-[title](#title) for an empty `extracted.md` is not added for a stored file: the result's `File:` lines
+[title](#title) for an empty extraction is not added for a stored file: the result's `File:` lines
 say where the body went, and [PDF](#pdf) states the notices of a PDF.
 
 ### 5.9 PDF {#pdf}
@@ -497,9 +507,9 @@ so far are kept, and the call adds the notice
 
 On the call's abort signal the worker is stopped, nothing is written, and the call ends with the
 tool error `WebFetch: cancelled`. When the document does not parse, or the worker fails, the file
-is kept, `extracted.md` is empty, and the call adds the notice
+is kept, the extraction is empty, and the call adds the notice
 `PDF text extraction failed (<reason>); the file is kept without text.` These are not tool errors.
-When no page yields text, for example a scanned PDF, the file is kept, `extracted.md` is empty, and
+When no page yields text, for example a scanned PDF, the file is kept, the extraction is empty, and
 the call adds the notice `No text found in the PDF; the file is kept.`
 
 Each page's text comes from its PDF.js `getTextContent()` items. The tool pairs the page's items
@@ -629,7 +639,7 @@ rendering, which the tool does not do. Text in annotations and form fields is no
 
 ## 7. Reformat {#reformat}
 
-The reformat has a second model fix the Markdown structure of `extracted.md`. Its output is
+The reformat has a second model fix the Markdown structure of the extraction. Its output is
 accepted only chunk by chunk, where the exact-content check ([exact-content check](#exact-content-check)) proves it holds the same text,
 code and URLs, so the model can rearrange formatting but cannot add, drop or change content.
 
@@ -662,15 +672,15 @@ the entry's `reformat` with the reformat model string and `extractedSha256`:
 - Same `model` and `sourceSha256`, the chunks of [chunks](#chunks) as many as `parts`, and some parts
   with result `model error` or `timed out`: only those chunks are sent again ([completion](#completion) to [kept chunks](#kept-chunks)); every
   other part keeps its text, cut from `content.md` by the `parts` lengths. A check failure is final
-  for that model and that `extracted.md`.
-- Otherwise every chunk of `extracted.md` is reformatted ([chunks](#chunks) to [kept chunks](#kept-chunks)).
+  for that model and that extraction.
+- Otherwise every chunk of the extraction is reformatted ([chunks](#chunks) to [kept chunks](#kept-chunks)).
 
 The reformat uses no network access other than the completions, and then writes `content.md` and
 `meta.json` per [writing](#writing). A call that does not request the reformat serves the entry as stored.
 
 ### 7.3 Chunks {#chunks}
 
-`extracted.md` is split into blocks: maximal runs of lines separated by one or more lines holding
+The extraction is split into blocks: maximal runs of lines separated by one or more lines holding
 only white space, where a fenced code block ([exact-content check](#exact-content-check), step 1) never spans two blocks. The chunk budget
 is the smaller of 2 × the model's `maxTokens` and 12000, in characters. Blocks are taken in order
 and appended to the current chunk, joined by an empty line, while its length stays within the
@@ -756,7 +766,7 @@ output that drops a separator, or splits a cell back into a list, fails the text
 
 ### 7.6 Kept chunks {#kept-chunks}
 
-A chunk that does not pass, or whose completion fails, is kept as it was in `extracted.md`, with
+A chunk that does not pass, or whose completion fails, is kept as it was in the extraction, with
 the first reason that applies, in this order:
 
 | Reason          | Case                                                          |
@@ -825,7 +835,7 @@ Reformat: <reformat state>
 [<remaining> more characters; read the rest from <display path of content.md>]
 ```
 
-The `Path:` line is present only when `content.md` is under cwd ([location](#cache-location)). The `File:`, `Absolute
+The `Path:` line is present only when `content.md` is under cwd ([location](#cache-location)). The `Extracted:` line is present only when the entry holds `extracted.md`. The `File:`, `Absolute
 file:` and `File type:` lines are present only when the entry stores a file ([stored files](#stored-files)); `File:` gives
 the display path ([location](#cache-location)), so it is absolute when the file is outside cwd.
 
@@ -840,7 +850,8 @@ sentence the tool adds to state a fallback or a recovered problem.
 ### 9.2 Details {#details}
 
 `details` is an object with `status`, `path` and `extractedPath` (the display paths of
-`content.md` and `extracted.md`, [location](#cache-location)), `absolutePath`, `cacheDir` (the absolute cache directory),
+`content.md` and of the file holding the extraction, `extracted.md` or else `content.md`,
+[location](#cache-location)), `absolutePath`, `cacheDir` (the absolute cache directory),
 `url`, `canonicalUrl`, `finalUrl`, `title` (string or null), `fetchedAt`, `length` (number),
 `previewLength` (number), `reformat` (the entry's `reformat`, [entry layout](#entry-layout)), `notices` (array of
 the notice strings) and `file`, null when the entry stores no file, else an object with `path` and
@@ -857,7 +868,7 @@ relative path, or the error message.
 The repository's tests MUST NOT reach the internet: HTTP tests use a local `node:http` server
 through the seam of [test seam](#test-seam). For each rule of [sanitizer](#sanitizer) (each element, attribute, style row and
 token, and each character class of [text cleaning](#text-cleaning)), a test MUST serve a page that hides the string
-`INJECTION-<rule>` in that way, and assert that the string is absent from `extracted.md`,
+`INJECTION-<rule>` in that way, and assert that the string is absent from the extraction,
 `content.md` and the result. A Markdown body ([markdown and plain-text bodies](#markdown-bodies)) MUST likewise be tested with each kind of
 removal of [removed elements](#removed-elements) and each hiding method of [hidden elements](#hidden-elements) written as embedded HTML, both as an
 HTML block and inline, including an unclosed element and Markdown text between an element's tags;
@@ -874,9 +885,16 @@ the result's `File:`, `Absolute file:` and `File type:` lines; `meta.json`'s `fi
 entry; JSON and XML data text kept as cleaned text with their structure intact ([data text](#data-text)). PDF fixtures
 are built by a committed helper in the test tree, not by committed binary files, and cover: a text
 PDF whose extracted text is checked; one PDF hiding `INJECTION-<rule>` in each removable way of [PDF](#pdf) (an invisible render mode, a font size below the threshold, a position outside the page box),
-each absent from `extracted.md` and the result; a PDF with no text and a corrupt PDF, each kept
+each absent from the extraction and the result; a PDF with no text and a corrupt PDF, each kept
 with its notice; a multi-page PDF whose `## Page n` sections are checked; lines placed by `Td`
 under a scaled `Tm`, one of them hidden; and a hidden run that PDF.js merges into a visible item.
+
+Entry tests MUST cover: an unreformatted entry holding no `extracted.md`; a reformatted entry
+holding both files, and a refetch that makes them equal again removing `extracted.md`; an entry of
+an older version with two equal files losing `extracted.md` when rewritten; an entry whose
+`extracted.md` was deleted served from cache; and one whose `content.md` no longer matches
+`extractedSha256` with `extracted.md` absent treated as unreadable. A page whose extraction holds
+only its title MUST get the notice of [title](#title).
 
 Cache location tests MUST set `env`, `homeDir` and `tmpDir` through the seam of [test seam](#test-seam), and
 never write into the real home folder or the root of the system temporary folder. They MUST cover each value form (`project`,
@@ -925,7 +943,7 @@ unrelated line before it.
   `content.md` and `meta.json` can briefly come from different calls.
 - Text hidden by a foreground colour equal to the background colour is kept.
 - The reformat model's output differs between runs, so `content.md` is not deterministic;
-  `extracted.md` is.
+  the extraction is.
 - The check of [exact-content check](#exact-content-check) lets the model drop or add the syntax it strips: emphasis characters,
   list numbers at a line start, `#` runs at a line start, and table pipes, escaped pipes included.
 - A new fence must copy its lines exactly, escapes included, so a fence that also unescapes code
