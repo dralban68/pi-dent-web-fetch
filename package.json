@@ -1,6 +1,6 @@
 {
   "name": "pi-dent-web",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A pi extension whose WebFetch tool fetches a web page as Markdown and caches it in the working folder",
   "keywords": [
     "markdown",
