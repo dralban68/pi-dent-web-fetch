@@ -295,7 +295,7 @@ added and win over the plugin's:
 - A table cell becomes `| ` (first cell) or ` `, then its content on one line, then ` |`. The
   content is the cell's converted Markdown split into lines; each line has its white-space runs
   collapsed to one space and its ends trimmed; empty lines and table delimiter lines (`|`, `:`,
-  `-` and spaces only, with at least one `-`) are dropped; the rest are joined with `·` (space,
+  `-` and spaces only, with at least one `|` and one `-`) are dropped; the rest are joined with `·` (space,
   U+00B7, space), and each `|` is written `\|`. So list items, paragraphs and nested table rows of
   a cell stay apart visibly.
 - Every element without another rule becomes its content, so no tag reaches the output.
