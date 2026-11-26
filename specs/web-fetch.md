@@ -29,13 +29,13 @@ In this spec, cwd means the context's `cwd` of the call.
 
 The extension MUST register exactly one tool, with `name` `WebFetch` and `label` `Web Fetch`.
 
-| Parameter     | Type    | Required | Default                                                        | Meaning                                                             |
-| ------------- | ------- | -------- | -------------------------------------------------------------- | ------------------------------------------------------------------- |
-| `url`         | string  | yes      |                                                                | The page to fetch                                                   |
-| `refresh`     | boolean | no       | `false`                                                        | Fetch unconditionally, even when fresh ([freshness](#freshness))    |
-| `maxAgeHours` | number  | no       | `24`                                                           | Freshness limit in hours, minimum 0 (inclusive)                     |
-| `reformat`    | boolean | no       | `web.reformat` ([configuration](#configuration)), else `false` | Reformat the Markdown by the reformat model ([reformat](#reformat)) |
-| `cache`       | string  | no       | [location](#cache-location)                                    | The cache location ([location](#cache-location))                    |
+| Parameter     | Type    | Required | Default                                                                                                     | Meaning                                                             |
+| ------------- | ------- | -------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| `url`         | string  | yes      |                                                                                                             | The page to fetch                                                   |
+| `refresh`     | boolean | no       | `false`                                                                                                     | Fetch unconditionally, even when fresh ([freshness](#freshness))    |
+| `maxAgeHours` | number  | no       | `24`                                                                                                        | Freshness limit in hours, minimum 0 (inclusive)                     |
+| `reformat`    | boolean | no       | `web.reformat` ([configuration](#configuration)), else `true` when `web.reformatModel` is set, else `false` | Reformat the Markdown by the reformat model ([reformat](#reformat)) |
+| `cache`       | string  | no       | [location](#cache-location)                                                                                 | The cache location ([location](#cache-location))                    |
 
 The schema MUST declare `minimum: 0` for `maxAgeHours`; the tool MUST also refuse a negative or
 non-finite `maxAgeHours` with the tool error `WebFetch: maxAgeHours must be a number of 0 or more`.
@@ -646,7 +646,10 @@ code and URLs, so the model can rearrange formatting but cannot add, drop or cha
 ### 7.1 Request and model {#reformat-model}
 
 A call requests the reformat when its `reformat` parameter is `true`, or is absent while
-`web.reformat` ([configuration](#configuration)) is `true`. The reformat model string is `web.reformatModel`. It MUST be
+`web.reformat` ([configuration](#configuration)) is `true`, or is absent while `web.reformat` is absent and
+`web.reformatModel` is set: a configured model is used on every fetch unless the call or
+`web.reformat` says `false`. A skipped reformat, or one whose every chunk is kept, leaves
+`content.md` equal to the extraction, so the entry holds no `extracted.md` ([entry layout](#entry-layout)). The reformat model string is `web.reformatModel`. It MUST be
 parsed and resolved per [pi-dent model-string], Sections 1 to 4: concrete selectors, class
 references through `modelClasses`, the `fallback` class and the thinking suffix, against the
 inventory `modelRegistry.getAll()` and the `modelClasses` value of the configuration ([configuration](#configuration)).
@@ -786,12 +789,12 @@ the first reason that applies, in this order:
 This specification contributes the root key `web` to pi-dent's configuration file
 (pi-dent-agent `specs/config-file.md`, Section 2):
 
-| Key                 | Type              | Contract                                                                |
-| ------------------- | ----------------- | ----------------------------------------------------------------------- |
-| `web`               | object, optional  | The settings of this extension                                          |
-| `web.reformat`      | boolean, optional | The default of the `reformat` parameter ([registration](#registration)) |
-| `web.reformatModel` | string, optional  | The reformat model string ([request and model](#reformat-model))        |
-| `web.cache`         | string, optional  | The cache location value ([location](#cache-location))                  |
+| Key                 | Type              | Contract                                                                                                                                       |
+| ------------------- | ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `web`               | object, optional  | The settings of this extension                                                                                                                 |
+| `web.reformat`      | boolean, optional | The default of the `reformat` parameter ([registration](#registration)); absent, the default is `true` exactly when `web.reformatModel` is set |
+| `web.reformatModel` | string, optional  | The reformat model string ([request and model](#reformat-model))                                                                               |
+| `web.cache`         | string, optional  | The cache location value ([location](#cache-location))                                                                                         |
 
 The extension MUST read the configuration as pi-dent-agent `specs/config-file.md`, Sections 1, 2,
 3 and 7, specify it, once per extension instance, at its first `session_start`, or at its first
@@ -907,7 +910,7 @@ Tests MUST cover an empty section removed (a heading followed only by the next h
 heading kept because its subsection holds content, and a table cell holding a list and one holding
 a nested table.
 
-Reformat tests MUST use a stubbed `modelRegistry` and cover at least: a valid reformat accepted;
+Reformat tests MUST use a stubbed `modelRegistry` and cover at least: a reformat run with only `web.reformatModel` set, none with `web.reformat` `false`; a valid reformat accepted;
 added, dropped and reworded text, each rejected with `text changed`; a changed URL rejected with
 `links changed`; a changed line inside a code block rejected with `code changed`; a valid new
 fence accepted; a new fence that changes its inner text, and a removed fence, each rejected with
