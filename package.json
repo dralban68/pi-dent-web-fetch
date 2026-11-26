@@ -30,12 +30,20 @@
     "fmt:check": "oxfmt --check .",
     "check": "pnpm typecheck && pnpm lint && pnpm fmt:check && pnpm test"
   },
+  "dependencies": {
+    "@mozilla/readability": "0.6.0",
+    "@truto/turndown-plugin-gfm": "1.0.7",
+    "jsonc-parser": "3.3.1",
+    "linkedom": "0.18.15",
+    "turndown": "7.2.5"
+  },
   "devDependencies": {
     "@earendil-works/pi-agent-core": "1.5.2",
     "@earendil-works/pi-ai": "1.5.2",
     "@earendil-works/pi-coding-agent": "1.5.2",
     "@earendil-works/pi-tui": "1.5.2",
     "@types/node": "^26.6.6",
+    "@types/turndown": "5.0.6",
     "oxfmt": "^0.77.0",
     "oxlint": "^1.93.0",
     "typebox": "1.3.27",
