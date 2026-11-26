@@ -9,6 +9,44 @@ terms:
     history:
       - date: 2026-11-26
         op: add
+  - id: block
+    label: block
+    meaning: "A maximal run of extracted.md's lines between blank lines, never splitting a fenced code block, from which chunks are packed."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: deprecate
+        reason: out-of-scope
+      - date: 2026-11-26
+        op: update
+        status: deprecated
+  - id: blocked-range
+    label: blocked range
+    meaning: "An IP address range the address guard refuses: unspecified, loopback, private, shared, link-local, unique-local, multicast or reserved."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: body-fallback
+    label: body fallback
+    meaning: "The use of the sanitized document's whole body when Readability finds no article or one under 200 characters of text."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - fallback
+    history:
+      - date: 2026-11-26
+        op: add
   - id: cache-directory
     label: cache directory
     meaning: "The one folder a call reads and writes cache entries in, chosen from the cache parameter, PI_DENT_WEB_CACHE_DIR, web.cache or the project default."
@@ -45,6 +83,48 @@ terms:
     history:
       - date: 2026-11-26
         op: add
+  - id: chunk
+    label: chunk
+    meaning: "Consecutive blocks within the chunk budget, sent to the reformat model as one completion and accepted or kept as one."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: confusable
+    status: active
+    distinguish:
+      - block
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: chunk-budget
+    label: chunk budget
+    meaning: "The most characters a chunk may have: the smaller of twice the model's maxTokens and 12000."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: code-check
+    label: code check
+    meaning: The part of the exact-content check that matches each input fence to an output fence and lets a new fence only wrap existing whole lines.
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: content-md
+    label: content.md
+    meaning: "The served file of a cache entry: the reformat's output when the entry is reformatted, else a copy of extracted.md."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: confusable
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
   - id: data-text
     label: data text
     meaning: "A JSON, CSV or XML body, decoded and text-cleaned but stored as it stands, neither parsed as Markdown nor sanitized."
@@ -54,6 +134,16 @@ terms:
     status: active
     distinguish:
       - stored-file
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: diagnostic
+    label: diagnostic
+    meaning: "One message reported to the user about a configuration, discovery, or catalog problem, or about a failure at run time that has no tool result to carry it"
+    owner: "../pi-dent-agent/specs/config-file.md"
+    group: pi-dent
+    key: shared
+    status: active
     history:
       - date: 2026-11-26
         op: add
@@ -77,6 +167,16 @@ terms:
     history:
       - date: 2026-11-26
         op: add
+  - id: empty-section
+    label: empty section
+    meaning: "An ATX heading whose section holds only empty and heading lines, removed from the Markdown."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
   - id: exact-content-check
     label: exact-content check
     meaning: "The comparison of a chunk's reduction before and after the reformat model, which accepts the output only when its text, code and URLs are unchanged."
@@ -87,9 +187,67 @@ terms:
     history:
       - date: 2026-11-26
         op: add
+  - id: extracted-md
+    label: extracted.md
+    meaning: "The file of a cache entry holding the content's Markdown as extraction produced it, before any reformat."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: confusable
+    status: active
+    distinguish:
+      - content-md
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: fallback
+    label: fallback
+    meaning: The reserved model class that absorbs a resolution miss
+    owner: "../pi-dent-agent/specs/model-string.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: fetch-status
+    label: fetch status
+    meaning: "How a call served its entry: fetched, cached, revalidated or stale."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: deprecated
+    reason: out-of-scope
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: deprecate
+        reason: out-of-scope
   - id: final-url
     label: final URL
     meaning: "The URL of the last hop of a fetch, the one whose response is not a redirect."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: fresh-entry
+    label: fresh entry
+    meaning: "A cache entry younger than maxAgeHours, served with status cached and no network access."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: update
+  - id: hidden-content-token
+    label: hidden-content token
+    meaning: "A class token or id, such as sr-only or visually-hidden, that the sanitizer treats as hiding its element."
     owner: specs/web-fetch.md
     group: WebFetch
     key: local
@@ -107,9 +265,189 @@ terms:
     history:
       - date: 2026-11-26
         op: add
+  - id: host
+    label: host
+    meaning: The pi process and extension API an extension runs in
+    owner: "../pi-dent-agent/specs/config-file.md"
+    group: pi-dent
+    key: confusable
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: html-pipeline
+    label: HTML pipeline
+    meaning: "The ordered steps that turn an HTML body into extracted.md: parse, read base URL and title, sanitize, Readability, convert, drop empty sections, clean, add the title heading."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: kept-chunk
+    label: kept chunk
+    meaning: "A chunk left as it was in extracted.md, with the first reason that applies, such as too long, timed out or text changed."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: label-line
+    label: label line
+    meaning: "An input line holding only one word that an output fence takes as its info string, folded into the fence for the exact-content check."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: layer
+    label: layer
+    meaning: One of the configuration file positions merged into the configuration
+    owner: "../pi-dent-agent/specs/config-file.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: location-value
+    label: location value
+    meaning: "A trimmed cache location string, project, session or a folder path, that chooses the cache directory."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - cache-directory
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: markdown-body
+    label: Markdown body
+    meaning: "A Markdown or plain-text response body, kept as Markdown text with its code verbatim and its embedded HTML sanitized and converted."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - data-text
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: media-type
+    label: media type
+    meaning: "The Content-Type value before any parameter, trimmed and lowercased, which decides how a body is handled."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: meta-json
+    label: meta.json
+    meaning: "The JSON object of a cache entry recording its URLs, fetch time, status, validators, sizes, stored file and reformat."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: update
+  - id: model-class
+    label: model class
+    meaning: A configured name that resolution maps to a model
+    owner: "../pi-dent-agent/specs/model-string.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: model-string
+    label: model string
+    meaning: The single string grammar that selects a model wherever a model is named
+    owner: "../pi-dent-agent/specs/model-string.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
   - id: notice
     label: notice
     meaning: A sentence the tool adds to its result to state a fallback or a recovered problem.
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: owning-layer
+    label: owning layer
+    meaning: The layer a configuration key is attributed to
+    owner: "../pi-dent-agent/specs/config-file.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: page-section
+    label: page section
+    meaning: "The `## Page n` heading and text that one PDF page with text contributes to extracted.md."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: deprecated
+    reason: out-of-scope
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: deprecate
+        reason: out-of-scope
+  - id: pi-dent-conf
+    label: pi-dent.conf
+    meaning: "pi-dent's JSONC configuration file, read from the global and the project layer directory and merged deeply"
+    owner: "../pi-dent-agent/specs/config-file.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: placeholder
+    label: placeholder
+    meaning: "An element standing for one run of Markdown text between HTML constructs while a Markdown body's HTML is sanitized, given back unchanged on conversion."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: preview
+    label: preview
+    meaning: "The first 4000 characters of content.md, shown in the result after its header lines."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: reduction
+    label: reduction
+    meaning: "A Markdown text's triple of code list, URL list and markup-free text, which the exact-content check compares."
     owner: specs/web-fetch.md
     group: WebFetch
     key: local
@@ -122,6 +460,54 @@ terms:
     meaning: "The optional pass in which a second model fixes the Markdown structure of extracted.md, accepted chunk by chunk only where the exact-content check passes."
     owner: specs/web-fetch.md
     group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: reformat-model-string
+    label: reformat model string
+    meaning: "The value of web.reformatModel: the model string that names the model a reformat uses."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - model-string
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: reformat-state
+    label: reformat state
+    meaning: "The result's Reformat line: none, or the model with its reformatted and kept chunk counts."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: deprecated
+    reason: out-of-scope
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: deprecate
+        reason: out-of-scope
+  - id: revalidation
+    label: revalidation
+    meaning: "A request for an entry that is no longer fresh, carrying its ETag and Last-Modified validators; a 304 answer keeps the entry with only fetchedAt changed."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - fresh-entry
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: root-key
+    label: root key
+    meaning: "A top-level key of pi-dent.conf, owned by the pi-dent spec or sibling package that defines its value"
+    owner: "../pi-dent-agent/specs/config-file.md"
+    group: pi-dent
     key: shared
     status: active
     history:
@@ -153,6 +539,16 @@ terms:
         to: show-text run
       - date: 2026-11-26
         op: update
+  - id: size-cap
+    label: size cap
+    meaning: "The most bytes a response body may have after content decoding: 10 MiB for a text kind, 50 MiB for a stored file; past it the call fails and nothing is cached."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
   - id: stale-copy
     label: stale copy
     meaning: "An existing cache entry served unchanged, with status stale and a notice, when a refetch fails."
@@ -173,6 +569,18 @@ terms:
     history:
       - date: 2026-11-26
         op: add
+  - id: test-seam
+    label: test seam
+    meaning: "The factory options (resolver, allowed addresses, environment, home and temporary folders) through which tests build the tool without the real network or folders."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: update
   - id: text-cleaning
     label: text cleaning
     meaning: "The removal of control, format and variation-selector characters and the mapping of other white space to one space, applied to every text the tool keeps."
@@ -185,3 +593,102 @@ terms:
     history:
       - date: 2026-11-26
         op: add
+  - id: text-item
+    label: item
+    meaning: "One text piece PDF.js getTextContent returns for a page, with its string, origin and end-of-line flag, paired with a show-text run to decide its visibility."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - show-text-run
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: text-kind
+    label: text kind
+    meaning: "A media type handled as text: HTML, Markdown, plain text or data text, as opposed to a stored file."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - stored-file
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: text-render-mode
+    label: text render mode
+    meaning: "The PDF Tr setting of how text is drawn; modes 3 (invisible) and 7 (clip only) draw nothing a reader sees."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: thinking-level
+    label: thinking level
+    meaning: The effort setting a model string can carry and a model can support
+    owner: "../pi-dent-agent/specs/model-string.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: tool-error
+    label: tool error
+    meaning: A tool result with isError true
+    owner: "../pi-dent-agent/specs/task.md"
+    group: pi-dent
+    key: shared
+    status: active
+    distinguish:
+      - tool-result
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: tool-result
+    label: tool result
+    meaning: "The result a tool call returns to the model: its content, details and error flag"
+    owner: "../pi-dent-agent/specs/task.md"
+    group: pi-dent
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: under-cwd
+    label: under cwd
+    meaning: "Said of a path whose path relative to cwd is not empty, starts with no .. segment and is not absolute."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: visible-box
+    label: visible box
+    meaning: "A PDF page's crop box, else its media box; text whose origin lies outside it is dropped."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: webfetch
+    label: WebFetch
+    meaning: "The tool of pi-dent-web-fetch that fetches one http or https URL into a cache entry, as sanitized Markdown or, for any other content, as a stored file whose PDF text is also extracted, and returns its path, status and a preview."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: update
+        meaning: "The tool this extension registers, which fetches an http or https URL into a cache entry and returns its path, status and a preview."

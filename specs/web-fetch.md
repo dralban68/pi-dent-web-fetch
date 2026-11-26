@@ -305,7 +305,7 @@ its temporary files.
 
 An entry's age is the current time minus `fetchedAt`. With `refresh` not `true`:
 
-- An entry younger than `maxAgeHours` hours (strictly) is fresh: it is served with status
+- An entry younger than `maxAgeHours` hours (strictly) is a fresh entry: it is served with status
   `cached`, and the call MUST make no resolution and no request.
 - Any other entry is revalidated: the request carries the validators of Section 3.3. A 304 rewrites
   `meta.json` with only `fetchedAt` changed, and the entry is served with status `revalidated`. A
