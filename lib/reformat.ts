@@ -11,7 +11,7 @@ import { checkChunk } from "./reduce.ts";
 import type { ThinkingLevel } from "./model.ts";
 import { cleanText } from "./text.ts";
 
-export const MAX_CHUNK_CHARS = 24_000;
+export const MAX_CHUNK_CHARS = 12_000;
 export const MAX_CHUNKS = 32;
 export const CHUNK_TIMEOUT_MS = 60_000;
 

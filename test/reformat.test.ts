@@ -7,7 +7,7 @@ import { test } from "node:test";
 
 import type { WebConfig } from "../lib/config.ts";
 import { checkChunk, reduce } from "../lib/reduce.ts";
-import { chunks } from "../lib/reformat.ts";
+import { chunkBudget, chunks } from "../lib/reformat.ts";
 import { call, html, resultText, startServer, stubRegistry, tempDir, text } from "./helpers.ts";
 
 const CONFIG: WebConfig = { reformat: true, reformatModel: "stub/fast", diagnostics: [] };
@@ -73,6 +73,44 @@ test("7.5 added, dropped and reworded text, and a changed URL, fail", () => {
     checkChunk(input, "## The quick fox jumps.\n\nSee **[docs](https://d.example/a)**."),
     "pass",
   );
+});
+
+test("7.5 a label line before code is folded into the fence's language, as on MDN", () => {
+  const input =
+    "In the second column.\n\nhtml\n\n```\n<table>\n</table>\n```\n\ncss\n\n```\ntd { padding: 0; }\n```";
+  const output =
+    "In the second column.\n\n```html\n<table>\n</table>\n```\n\n```css\ntd { padding: 0; }\n```";
+  assert.equal(checkChunk(input, output), "pass");
+  assert.equal(checkChunk("Run:\n\nsh\n\nnpm i x\n", "Run:\n\n```sh\nnpm i x\n```"), "pass");
+});
+
+test("7.5 a label word that differs from the info string is not folded", () => {
+  assert.equal(
+    checkChunk("Intro.\n\nhtml\n\n```\nx\n```", "Intro.\n\n```css\nx\n```"),
+    "text changed",
+  );
+  assert.equal(
+    checkChunk("Intro.\n\nHTML\n\n```\nx\n```", "Intro.\n\n```html\nx\n```"),
+    "text changed",
+  );
+});
+
+test("7.5 a label line with other text in it is not folded", () => {
+  assert.equal(checkChunk("See html\n\n```\nx\n```", "See\n\n```html\nx\n```"), "text changed");
+  assert.equal(checkChunk("See html\n\n```\nx\n```", "```html\nx\n```"), "text changed");
+});
+
+test("7.5 a fence that already has its language lets no unrelated line before it go", () => {
+  assert.equal(
+    checkChunk("Intro.\n\nNote\n\n```js\nx\n```", "Intro.\n\n```js\nx\n```"),
+    "text changed",
+  );
+  assert.equal(checkChunk("Intro.\n\njs\n\n```js\nx\n```", "Intro.\n\n```js\nx\n```"), "pass");
+});
+
+test("7.3 the chunk budget is twice maxTokens, at most 12000 characters", () => {
+  assert.equal(chunkBudget(100), 200);
+  assert.equal(chunkBudget(131_072), 12_000);
 });
 
 test("7.3 chunks pack blocks within the budget and keep a fence in one block", () => {

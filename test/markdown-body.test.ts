@@ -15,10 +15,10 @@ import { call, resultText, startServer, tempDir, text } from "./helpers.ts";
 const PROSE = "Visible Markdown prose that every reader sees.";
 const RAW_HTML = /(?<!\\)<[A-Za-z/!?]/;
 
-async function fetchBody(t: TestContext, body: string) {
+async function fetchBody(t: TestContext, body: string, type = "text/markdown") {
   const server = await startServer(t);
   const cwd = await tempDir(t);
-  server.route("/doc.md", text(`# Doc\n\n${PROSE}\n\n${body}\n\nVISIBLE-AFTER\n`));
+  server.route("/doc.md", text(`# Doc\n\n${PROSE}\n\n${body}\n\nVISIBLE-AFTER\n`, type));
   const result = await call(cwd, { url: `${server.origin}/doc.md` });
   return {
     extracted: await readFile(join(cwd, result.details.extractedPath), "utf8"),
@@ -27,8 +27,8 @@ async function fetchBody(t: TestContext, body: string) {
   };
 }
 
-async function assertHidden(t: TestContext, rule: string, body: string) {
-  const out = await fetchBody(t, body);
+async function assertHidden(t: TestContext, rule: string, body: string, type?: string) {
+  const out = await fetchBody(t, body, type);
   for (const [name, value] of Object.entries(out)) {
     assert.ok(!value.includes(`INJECTION-${rule}`), `${name} holds INJECTION-${rule}:\n${value}`);
     assert.ok(value.includes(PROSE), `${name} lost the prose`);
@@ -134,4 +134,27 @@ test("5.5 a body cannot name a placeholder to bring back hidden text", async (t)
     "placeholder",
     "<div hidden>INJECTION-placeholder</div>\n\n<pi-md-0>x</pi-md-0><x-md-1>x</x-md-1>",
   );
+});
+
+test("5.5 a plain-text body's HTML is sanitized like a Markdown body's", async (t) => {
+  const plain = "text/plain";
+  await assertHidden(t, "div", "<div hidden>\n\nINJECTION-div in plain text\n\n</div>", plain);
+  await assertHidden(t, "comment", "Before <!-- INJECTION-comment --> after.", plain);
+  await assertHidden(t, "script", "<script>\nINJECTION-script\n</script>", plain);
+  await assertHidden(
+    t,
+    "class",
+    'Shown <span class="visually-hidden">INJECTION-class</span> shown.',
+    plain,
+  );
+});
+
+test("5.5 a plain-text body keeps a code fence holding HTML verbatim", async (t) => {
+  const out = await fetchBody(
+    t,
+    "```\n<div hidden>fenced</div>\n```\n\nAnd <b>bold</b>.",
+    "text/plain",
+  );
+  assert.ok(out.extracted.includes("```\n<div hidden>fenced</div>\n```"));
+  assert.ok(out.extracted.includes("And **bold**."));
 });

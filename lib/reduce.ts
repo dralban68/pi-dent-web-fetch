@@ -97,41 +97,119 @@ function sorted(values: readonly string[]): string[] {
   });
 }
 
-/** Whether `content` equals a run of one or more consecutive whole lines of `input`. */
-function isLineRun(content: string, inputLines: readonly string[]): boolean {
-  if (content === "") return true;
-  const wanted = content.split("\n");
-  for (let start = 0; start + wanted.length <= inputLines.length; start += 1) {
-    if (wanted.every((line, offset) => inputLines[start + offset] === line)) return true;
-  }
-  return false;
+interface Fence {
+  /** The opening line's info string, trimmed. */
+  readonly info: string;
+  readonly content: string;
+  /** Line indexes of the opening and closing fence lines (`close` is past the end when unclosed). */
+  readonly open: number;
+  readonly close: number;
 }
 
-/** The code check of Section 7.5: existing fences kept exactly, new fences copy input lines. */
-export function codeCheck(
-  input: string,
-  inputCode: readonly string[],
-  outputCode: readonly string[],
-) {
+/** The fenced code blocks of a text, by the fence rule of step 1. */
+function fenceBlocks(lines: readonly string[]): Fence[] {
+  const out: Fence[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index] ?? "";
+    const open = FENCE_OPEN.exec(line)?.[1];
+    if (open === undefined) {
+      index += 1;
+      continue;
+    }
+    const close = new RegExp(`^ {0,3}\\${open.charAt(0)}{${open.length},} *$`);
+    const start = index;
+    const content: string[] = [];
+    index += 1;
+    while (index < lines.length && !close.test(lines[index] ?? "")) {
+      content.push(lines[index] ?? "");
+      index += 1;
+    }
+    out.push({
+      info: line.replace(/^ *[`~]+/, "").trim(),
+      content: content.join("\n"),
+      open: start,
+      close: index,
+    });
+    index += 1;
+  }
+  return out;
+}
+
+/** The first run of input lines equal to `wanted` starting at or after `from`, else anywhere. */
+function lineRun(
+  wanted: readonly string[],
+  lines: readonly string[],
+  from: number,
+): number | undefined {
+  const matches = (start: number) => wanted.every((line, offset) => lines[start + offset] === line);
+  for (let start = from; start + wanted.length <= lines.length; start += 1) {
+    if (matches(start)) return start;
+  }
+  for (let start = 0; start < from && start + wanted.length <= lines.length; start += 1) {
+    if (matches(start)) return start;
+  }
+  return undefined;
+}
+
+export interface CodeCheck {
+  readonly ok: boolean;
+  /** Input line indexes of label lines folded into a fence's info string. */
+  readonly folded: ReadonlySet<number>;
+}
+
+/**
+ * The code check of Section 7.5: existing fences kept exactly, new fences copy input lines; and
+ * the label lines folded into an output fence's one-word info string.
+ */
+export function codeCheck(input: string, output: string): CodeCheck {
   const inputLines = input.split("\n");
+  const inputFences = fenceBlocks(inputLines);
+  const inFence = new Set<number>();
+  for (const fence of inputFences) {
+    for (let line = fence.open; line <= fence.close; line += 1) inFence.add(line);
+  }
+  const folded = new Set<number>();
   let next = 0;
-  for (const content of outputCode) {
-    if (next < inputCode.length && inputCode[next] === content) {
+  let cursor = 0;
+  for (const fence of fenceBlocks(output.split("\n"))) {
+    let anchor: number;
+    const existing = inputFences[next];
+    if (existing !== undefined && existing.content === fence.content) {
+      anchor = existing.open;
+      cursor = existing.close + 1;
       next += 1;
-    } else if (!isLineRun(content, inputLines)) {
-      return false;
+    } else if (fence.content === "") {
+      continue;
+    } else {
+      const wanted = fence.content.split("\n");
+      const start = lineRun(wanted, inputLines, cursor);
+      if (start === undefined) return { ok: false, folded };
+      anchor = start;
+      cursor = start + wanted.length;
+    }
+    if (!/^\S+$/.test(fence.info)) continue;
+    let label = anchor - 1;
+    while (label >= 0 && (inputLines[label] ?? "").trim() === "") label -= 1;
+    if (label >= 0 && !inFence.has(label) && (inputLines[label] ?? "").trim() === fence.info) {
+      folded.add(label);
     }
   }
-  return next === inputCode.length;
+  return { ok: next === inputFences.length, folded };
 }
 
 export type CheckResult = "pass" | "code changed" | "links changed" | "text changed";
 
 /** The exact-content check of a chunk and its processed output (Section 7.5). */
 export function checkChunk(input: string, output: string): CheckResult {
-  const a = reduce(input);
+  const code = codeCheck(input, output);
+  if (!code.ok) return "code changed";
+  const kept = input
+    .split("\n")
+    .map((line, index) => (code.folded.has(index) ? "" : line))
+    .join("\n");
+  const a = reduce(kept);
   const b = reduce(output);
-  if (!codeCheck(input, a.code, b.code)) return "code changed";
   const urlsA = sorted(a.urls);
   const urlsB = sorted(b.urls);
   if (urlsA.length !== urlsB.length || urlsA.some((url, i) => url !== urlsB[i])) {

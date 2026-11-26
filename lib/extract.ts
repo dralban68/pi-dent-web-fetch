@@ -225,7 +225,7 @@ function markdownTitle(markdown: string): string | null {
   return text === "" ? null : text;
 }
 
-/** Section 5.5: a Markdown body with its embedded HTML sanitized and converted. */
+/** Section 5.5: a Markdown or plain-text body with its embedded HTML sanitized and converted. */
 function markdownBody(text: string, finalUrl: string): string {
   const sanitized = sanitizeMarkdownHtml(text, finalUrl);
   if (sanitized === undefined) return text;
@@ -237,7 +237,7 @@ function markdownBody(text: string, finalUrl: string): string {
 /** Content of any supported kind to the text of `extracted.md`. */
 export function extract(kind: ContentKind, text: string, finalUrl: string): Extracted {
   if (kind === "html") return extractHtml(text, finalUrl);
-  const markdown = kind === "markdown" ? markdownBody(cleanText(text), finalUrl) : cleanText(text);
+  const markdown = markdownBody(cleanText(text), finalUrl);
   const notices = markdown.trim() === "" ? [NOTICE_EMPTY] : [];
   return { markdown, title: kind === "markdown" ? markdownTitle(markdown) : null, notices };
 }
