@@ -28,7 +28,10 @@ test("3.3 sends GET with the User-Agent, Accept and Accept-Encoding headers", as
       `^pi-dent-web-fetch/${VERSION.replaceAll(".", "\\.")} \\(\\+https://github\\.com/.+/pi-dent-web-fetch#readme\\)$`,
     ),
   );
-  assert.equal(req?.headers.accept, "text/markdown, text/html;q=0.9, text/plain;q=0.8");
+  assert.equal(
+    req?.headers.accept,
+    "text/markdown, text/html;q=0.9, text/plain;q=0.8, application/pdf;q=0.7",
+  );
   assert.equal(req?.headers["accept-encoding"], "gzip, deflate, br");
 });
 
@@ -249,20 +252,12 @@ test("3.8 decodes by the header charset, else the meta charset, and reports an u
   assert.ok(odd.details.notices.includes("Unknown charset x-nonsense; decoded as UTF-8."));
 });
 
-test("5.1 refuses other content types, naming the type", async (t) => {
+test("5.1 refuses a body with no media type", async (t) => {
   const server = await startServer(t);
-  server.route("/f.pdf", (_req, res) =>
-    res.writeHead(200, { "content-type": "application/pdf" }).end("%PDF"),
-  );
   server.route("/none", (_req, res) => res.writeHead(200).end("x"));
-  const cwd = await tempDir(t);
-  await assert.rejects(call(cwd, { url: `${server.origin}/f.pdf` }), {
-    message: `WebFetch: unsupported content type application/pdf from ${server.origin}/f.pdf; only HTML, Markdown and plain text are fetched`,
+  await assert.rejects(call(await tempDir(t), { url: `${server.origin}/none` }), {
+    message: `WebFetch: no media type from ${server.origin}/none`,
   });
-  await assert.rejects(
-    call(cwd, { url: `${server.origin}/none` }),
-    /unsupported content type none from/,
-  );
 });
 
 test("5.1 stores Markdown and plain text with text cleaning only", async (t) => {

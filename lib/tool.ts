@@ -14,6 +14,7 @@ import {
   NOTICE_UNREADABLE,
   KEPT_REASONS,
   entryPaths,
+  filePath,
   readEntry,
   serializeMeta,
   sha256,
@@ -24,12 +25,21 @@ import {
   type ReformatMeta,
 } from "./cache.ts";
 import type { Environment, WebConfig } from "./config.ts";
-import { contentKind, decodeBody } from "./decode.ts";
+import { contentKind, decodeBody, fileExtension } from "./decode.ts";
 import { WebFetchError, errorMessage } from "./errors.ts";
 import { extract } from "./extract.ts";
 import { fetchPage, systemResolver, type Resolver } from "./http.ts";
-import { chooseLocation, type CacheLocation } from "./location.ts";
+import { chooseLocation, relativeUnder, type CacheLocation } from "./location.ts";
 import { resolveModelString } from "./model.ts";
+import {
+  NOTICE_NO_TEXT,
+  NOTICE_PAGE_LIMIT,
+  NOTICE_TIMEOUT,
+  EXTRACTION_BUDGET_MS,
+  extractPdf,
+  noticeFailed,
+  pagesToMarkdown,
+} from "./pdf.ts";
 import { isReusable, reformat, type Registry } from "./reformat.ts";
 import { canonicalIp } from "./address.ts";
 import { canonicalUrl, validateUrl } from "./url.ts";
@@ -59,9 +69,16 @@ export const WebFetchSchema = Type.Object({
 });
 
 export const WEBFETCH_DESCRIPTION =
-  "Fetch a web page (http or https) as Markdown and cache it, by default under .pi/web-cache/ in the working directory. Returns the cache path of content.md, the status (fetched, cached, revalidated, stale) and a preview; read the rest of the page from the path. Text hidden from readers is removed. A fresh cached copy is served without network access.";
+  "Fetch a web page (http or https) as Markdown and cache it, by default under .pi/web-cache/ in the working directory. A non-text response (image, archive, PDF, anything without a text content type) is stored unchanged into the cache entry as file.<ext>; PDFs also get their text extracted. Returns the cache path of content.md, the status (fetched, cached, revalidated, stale) and a preview; read the rest of the page from the path. Text hidden from readers is removed. A fresh cached copy is served without network access.";
 
 export type FetchStatus = "fetched" | "cached" | "revalidated" | "stale";
+
+export interface StoredFileDetails {
+  readonly path: string;
+  readonly absolutePath: string;
+  readonly contentType: string;
+  readonly bytes: number;
+}
 
 export interface WebFetchDetails {
   readonly status: FetchStatus;
@@ -77,6 +94,7 @@ export interface WebFetchDetails {
   readonly length: number;
   readonly previewLength: number;
   readonly reformat: ReformatMeta | null;
+  readonly file: StoredFileDetails | null;
   readonly notices: readonly string[];
 }
 
@@ -147,10 +165,18 @@ function resultText(
   content: string,
   shown: string,
 ): string {
+  const file = details.file;
   const lines = [
     `WebFetch: ${details.status}`,
     ...(underCwd ? [`Path: ${details.path}`] : []),
     `Absolute path: ${details.absolutePath}`,
+    ...(file === null
+      ? []
+      : [
+          `File: ${file.path} (${file.bytes} bytes)`,
+          `Absolute file: ${file.absolutePath}`,
+          `File type: ${file.contentType}`,
+        ]),
     `Extracted: ${details.extractedPath}`,
     `Title: ${details.title ?? "(none)"}`,
     `URL: ${details.finalUrl}`,
@@ -181,6 +207,7 @@ async function fetchAndStore(
   notices: string[],
   signal: AbortSignal | undefined,
   options: WebFetchOptions,
+  extractionBudgetMs: number,
 ): Promise<Served> {
   const response = await fetchPage({
     url: canonical,
@@ -197,6 +224,52 @@ async function fetchAndStore(
     return { entry: { ...previous, meta }, status: "revalidated" };
   }
   const kind = contentKind(response.contentType, response.finalUrl);
+  if (kind === "pdf" || kind === "binary") {
+    // Sections 5.8 and 5.9: the body is stored unchanged; a PDF's text is extracted.
+    const fileName = `file.${fileExtension(response.contentType, response.finalUrl)}`;
+    let markdown = "";
+    if (kind === "pdf") {
+      const extraction = await extractPdf(response.body, {
+        timeoutMs: Math.max(0, extractionBudgetMs),
+        signal,
+      });
+      if (extraction.outcome === "failed") {
+        notices.push(noticeFailed(extraction.reason ?? "the extraction failed"));
+      }
+      if (extraction.outcome === "timeout") notices.push(NOTICE_TIMEOUT);
+      if (extraction.outcome === "page-limit") notices.push(NOTICE_PAGE_LIMIT);
+      markdown = pagesToMarkdown(extraction.pages);
+      if (
+        (extraction.outcome === "complete" || extraction.outcome === "page-limit") &&
+        markdown === ""
+      ) {
+        notices.push(NOTICE_NO_TEXT);
+      }
+    }
+    const meta: Meta = {
+      url: params.url,
+      canonicalUrl: canonical,
+      finalUrl: response.finalUrl,
+      fetchedAt: now,
+      status: response.status,
+      contentType: response.contentType ?? "",
+      etag: response.etag,
+      lastModified: response.lastModified,
+      title: null,
+      bytes: response.body.length,
+      fileName,
+      fileBytes: response.body.length,
+      extractedSha256: sha256(markdown),
+      reformat: null,
+    };
+    await writeEntry(location, paths, [
+      [filePath(paths.dir, fileName), response.body],
+      [paths.extracted, markdown],
+      [paths.content, markdown],
+      [paths.meta, serializeMeta(meta)],
+    ]);
+    return { entry: { meta, extracted: markdown, content: markdown }, status: "fetched" };
+  }
   const decoded = decodeBody(response.body, response.contentType, kind);
   if (decoded.notice !== undefined) notices.push(decoded.notice);
   const result = extract(kind, decoded.text, response.finalUrl);
@@ -212,6 +285,8 @@ async function fetchAndStore(
     lastModified: response.lastModified,
     title: result.title,
     bytes: response.body.length,
+    fileName: null,
+    fileBytes: null,
     extractedSha256: sha256(result.markdown),
     reformat: null,
   };
@@ -282,6 +357,7 @@ export async function runWebFetch(
   signal: AbortSignal | undefined,
   options: WebFetchOptions = {},
 ): Promise<AgentToolResult<WebFetchDetails>> {
+  const startedAt = Date.now();
   const maxAgeHours = params.maxAgeHours ?? DEFAULT_MAX_AGE_HOURS;
   if (!Number.isFinite(maxAgeHours) || maxAgeHours < 0) {
     throw new WebFetchError("input", "WebFetch: maxAgeHours must be a number of 0 or more");
@@ -319,6 +395,7 @@ export async function runWebFetch(
         notices,
         signal,
         options,
+        startedAt + EXTRACTION_BUDGET_MS - Date.now(),
       );
     } catch (error) {
       if (entry === undefined || !(error instanceof WebFetchError) || error.kind !== "fetch") {
@@ -335,6 +412,19 @@ export async function runWebFetch(
   if (params.reformat ?? config.reformat ?? false) {
     final = await applyReformat(final, config, ctx, location, paths, notices, signal);
   }
+  const meta = final.meta;
+  const storedFile =
+    meta.fileName == null
+      ? null
+      : (() => {
+          const absolutePath = filePath(paths.dir, meta.fileName);
+          return {
+            path: relativeUnder(ctx.cwd, absolutePath) ?? absolutePath,
+            absolutePath,
+            contentType: meta.contentType,
+            bytes: meta.fileBytes ?? meta.bytes,
+          };
+        })();
   const shown = preview(final.content);
   const details: WebFetchDetails = {
     status: served.status,
@@ -350,6 +440,7 @@ export async function runWebFetch(
     length: final.content.length,
     previewLength: shown.length,
     reformat: final.meta.reformat,
+    file: storedFile,
     notices,
   };
   const text = resultText(details, paths.relativeContent !== undefined, final.content, shown);

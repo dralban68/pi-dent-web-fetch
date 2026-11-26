@@ -181,6 +181,9 @@ importers:
       turndown:
         specifier: 7.2.5
         version: 7.2.5
+      unpdf:
+        specifier: 2.2.2
+        version: 2.2.2
     devDependencies:
       '@earendil-works/pi-agent-core':
         specifier: 1.5.2
@@ -1205,6 +1208,18 @@ packages:
     resolution: {integrity: sha512-+fdndUTwBP86cVjihTp21hZHo7d6oj1c/47XPA3lL8mM0XHs+C4EkcjmgRsFnFk2f/UONGDy9ItBItmXsLOQHw==}
     engines: {node: '>=22.19.0'}
 
+  unpdf@2.2.2:
+    resolution: {integrity: sha512-oYnk0gwtIFVtkDbrll9SOEpXT4yCpCVkqQ/pxgxm9oNZ0GwpkEtRsrJZdyAvXHjaerrQTDFMaGWKWG+CKnb4cw==}
+    engines: {node: '>=24'}
+    peerDependencies:
+      '@napi-rs/canvas': ^0.1.69 || ^1.0.0
+      pdfjs-dist: '*'
+    peerDependenciesMeta:
+      '@napi-rs/canvas':
+        optional: true
+      pdfjs-dist:
+        optional: true
+
   web-streams-polyfill@3.3.3:
     resolution: {integrity: sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw==}
     engines: {node: '>= 8'}
@@ -2183,6 +2198,8 @@ snapshots:
   undici-types@8.9.0: {}
 
   undici@8.12.3: {}
+
+  unpdf@2.2.2: {}
 
   web-streams-polyfill@3.3.3: {}
 

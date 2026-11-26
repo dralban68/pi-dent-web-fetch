@@ -1,7 +1,7 @@
 /** The cache (specs/web-fetch.md, Sections 4.1 to 4.3): location, entry layout, writing. */
 
 import { createHash, randomBytes } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { WebFetchError, errorMessage } from "./errors.ts";
@@ -48,6 +48,10 @@ export interface Meta {
   readonly lastModified: string | null;
   readonly title: string | null;
   readonly bytes: number;
+  /** The stored file's name (`file.<ext>`, 5.8), null when the entry stores no file. */
+  readonly fileName?: string | null;
+  /** The stored file's size in bytes, null when the entry stores no file. */
+  readonly fileBytes?: number | null;
   readonly extractedSha256: string;
   readonly reformat: ReformatMeta | null;
 }
@@ -68,6 +72,11 @@ export interface EntryPaths {
   /** The display paths of Section 4.1. */
   readonly displayContent: string;
   readonly displayExtracted: string;
+}
+
+/** The path of a stored file inside the entry (Section 5.8). */
+export function filePath(dir: string, name: string): string {
+  return join(dir, name);
 }
 
 export function sha256(text: string): string {
@@ -121,6 +130,10 @@ const isString = (value: unknown): value is string => typeof value === "string";
 const isNumber = (value: unknown): value is number => typeof value === "number";
 const isNullableString = (value: unknown): value is string | null =>
   value === null || typeof value === "string";
+const isNullableNumber = (value: unknown): value is number | null =>
+  value === null || typeof value === "number";
+
+const STORED_NAME = /^file\.[a-z0-9]{1,8}$/;
 
 function isReason(value: unknown): value is KeptReason {
   return KEPT_REASONS.some((reason) => reason === value);
@@ -162,6 +175,12 @@ export function isMeta(value: unknown): value is Meta {
     isNullableString(value.lastModified) &&
     isNullableString(value.title) &&
     isNumber(value.bytes) &&
+    // Entries written by an older version may lack both fields; they store no file.
+    (value.fileName === undefined ||
+      (isNullableString(value.fileName) &&
+        (value.fileName === null || STORED_NAME.test(value.fileName)))) &&
+    (value.fileBytes === undefined || isNullableNumber(value.fileBytes)) &&
+    ((value.fileName ?? null) === null) === ((value.fileBytes ?? null) === null) &&
     isString(value.extractedSha256) &&
     (value.reformat === null || isReformat(value.reformat))
   );
@@ -178,29 +197,51 @@ async function readOptional(path: string): Promise<string | undefined> {
 
 /**
  * The entry, `"absent"` when its directory holds none of its files, or `"unreadable"` when some
- * file is missing or `meta.json` is not valid (Section 4.2).
+ * file is missing or `meta.json` is not valid (Section 4.2). A stored file (5.8) counts: an entry
+ * whose `meta.json` names one requires it to exist.
  */
 export async function readEntry(paths: EntryPaths): Promise<Entry | "absent" | "unreadable"> {
-  let texts: (string | undefined)[];
+  let metaText: string | undefined;
+  let extractedText: string | undefined;
+  let contentText: string | undefined;
   try {
-    texts = await Promise.all([paths.meta, paths.extracted, paths.content].map(readOptional));
+    [metaText, extractedText, contentText] = await Promise.all(
+      [paths.meta, paths.extracted, paths.content].map(readOptional),
+    );
   } catch {
     // A read error other than a missing file counts as an unreadable entry, which is reported.
     return "unreadable";
   }
-  const [metaText, extracted, content] = texts;
-  if (metaText === undefined && extracted === undefined && content === undefined) return "absent";
-  if (metaText === undefined || extracted === undefined || content === undefined) {
+  if (metaText === undefined && extractedText === undefined && contentText === undefined) {
+    return "absent";
+  }
+  if (metaText === undefined || extractedText === undefined || contentText === undefined) {
     return "unreadable";
   }
-  let meta: unknown;
+  let parsed: unknown;
   try {
-    meta = JSON.parse(metaText);
+    parsed = JSON.parse(metaText);
   } catch {
-    // Reported as an unreadable entry.
     return "unreadable";
   }
-  return isMeta(meta) ? { meta, extracted, content } : "unreadable";
+  if (!isMeta(parsed)) return "unreadable";
+  const meta = normalizeMeta(parsed);
+  const name: string | null = meta.fileName ?? null;
+  if (name !== null && !(await isFile(filePath(paths.dir, name)))) return "unreadable";
+  return { meta, extracted: extractedText, content: contentText };
+}
+
+async function isFile(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/** Fills the fields an older entry may lack (Section 4.2). */
+function normalizeMeta(meta: Meta): Meta {
+  return meta.fileName === undefined ? { ...meta, fileName: null, fileBytes: null } : meta;
 }
 
 /**
@@ -219,22 +260,27 @@ export async function ensureCacheDirectory(location: CacheLocation): Promise<voi
 
 /**
  * Writes the given files of an entry in order, each through a temporary file and a rename,
- * skipping a file whose content is unchanged (Section 4.3).
+ * skipping a file whose content is unchanged (Section 4.3). A `Buffer` is written as bytes, a
+ * string as UTF-8 text.
  */
 export async function writeEntry(
   location: CacheLocation,
   paths: EntryPaths,
-  files: readonly (readonly [path: string, text: string])[],
+  files: readonly (readonly [path: string, content: string | Buffer])[],
 ): Promise<void> {
   const temporary: string[] = [];
   try {
     await ensureCacheDirectory(location);
     await mkdir(paths.dir, { recursive: true });
-    for (const [path, text] of files) {
-      if ((await readOptional(path)) === text) continue;
+    for (const [path, content] of files) {
+      const unchanged =
+        typeof content === "string"
+          ? (await readOptional(path)) === content
+          : (await readOptionalBytes(path))?.equals(content) === true;
+      if (unchanged) continue;
       const temp = join(paths.dir, `.${randomBytes(6).toString("hex")}.tmp`);
       temporary.push(temp);
-      await writeFile(temp, text, "utf8");
+      await writeFile(temp, content);
       await rename(temp, path);
     }
   } catch (error) {
@@ -243,6 +289,15 @@ export async function writeEntry(
       "fetch",
       `WebFetch: cannot write the cache entry ${paths.dir}: ${errorMessage(error)}`,
     );
+  }
+}
+
+async function readOptionalBytes(path: string): Promise<Buffer | undefined> {
+  try {
+    return await readFile(path);
+  } catch (error) {
+    if (isRecord(error) && error.code === "ENOENT") return undefined;
+    throw error;
   }
 }
 

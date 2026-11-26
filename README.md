@@ -15,6 +15,14 @@ It returns the path of the cached `content.md`, the status (`fetched`, `cached`,
 A fresh entry is served without network access; an older one is revalidated with its `ETag` or
 `Last-Modified`. Loopback, private and link-local addresses are refused, redirects included.
 
+A response that is not HTML, Markdown, plain text or data text (JSON, CSV, XML) is downloaded,
+not refused: the body is stored unchanged in the cache entry as `file.<ext>` (the extension from
+the content type, else the URL, else `bin`; never a server-supplied file name), and the result
+gives the file's path, type and size, never its bytes. A PDF is stored too, and its text is
+extracted into `content.md`, one `## Page n` section per page, with text a reader cannot see
+(invisible render mode, below 1 pt, off the page) dropped. Text bodies are capped at 10 MiB,
+stored files at 50 MiB.
+
 ## Configuration
 
 In pi-dent's `pi-dent.conf`:

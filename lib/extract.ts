@@ -234,9 +234,17 @@ function markdownBody(text: string, finalUrl: string): string {
   return cleanText(dropEmptySections(toMarkdown(root, service)));
 }
 
-/** Content of any supported kind to the text of `extracted.md`. */
+/** Content of any supported kind to the text of `extracted.md` (Sections 5.5 and 5.7). */
 export function extract(kind: ContentKind, text: string, finalUrl: string): Extracted {
   if (kind === "html") return extractHtml(text, finalUrl);
+  if (kind === "data") {
+    // Data text (5.7): cleaned, stored as it stands; no Markdown, no sanitizing, no title.
+    return { markdown: cleanText(text), title: null, notices: [] };
+  }
+  if (kind === "pdf" || kind === "binary") {
+    // A stored file's text comes from Section 5.9 (PDF) or is empty (5.8); the caller fills it in.
+    return { markdown: "", title: null, notices: [] };
+  }
   const markdown = markdownBody(cleanText(text), finalUrl);
   const notices = markdown.trim() === "" ? [NOTICE_EMPTY] : [];
   return { markdown, title: kind === "markdown" ? markdownTitle(markdown) : null, notices };

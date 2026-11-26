@@ -472,7 +472,9 @@ The stored name MUST NOT depend on a server-supplied filename: a `Content-Dispos
 the URL's file name beyond its extension are never used for the path and never reach `meta.json`
 or the result. `meta.json` records the stored name in `fileName` and its size in bytes in
 `fileBytes`; `bytes` (3.6) and `fileBytes` are then equal. The body never enters the model
-context: the result names the file, its media type, its size and the status (9.1).
+context: the result names the file, its media type, its size and the status (9.1). The notice of
+Section 5.4 for an empty `extracted.md` is not added for a stored file: the result's `File:` lines
+say where the body went, and Section 5.9 states the notices of a PDF.
 
 ### 5.9 PDF
 

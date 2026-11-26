@@ -12,12 +12,16 @@ import type { Readable } from "node:stream";
 import { createBrotliDecompress, createGunzip, createInflate } from "node:zlib";
 
 import { blockedKind, canonicalIp, isLocalhostName } from "./address.ts";
+import { isTextMediaType, mediaType } from "./decode.ts";
 import { WebFetchError, errorMessage } from "./errors.ts";
 
 export const MAX_REDIRECTS = 5;
 export const TIMEOUT_MS = 30_000;
+/** The cap of Section 3.6 for the text kinds of Section 5.1. */
 export const MAX_BODY_BYTES = 10 * 1024 * 1024;
-export const ACCEPT = "text/markdown, text/html;q=0.9, text/plain;q=0.8";
+/** The cap of Section 3.6 for stored files, PDFs included (5.8). */
+export const MAX_STORED_BYTES = 50 * 1024 * 1024;
+export const ACCEPT = "text/markdown, text/html;q=0.9, text/plain;q=0.8, application/pdf;q=0.7";
 
 /** Every address of a host name (the test seam of Section 2.2). */
 export type Resolver = (hostname: string) => Promise<string[]>;
@@ -234,7 +238,14 @@ export async function fetchPage(request: FetchRequest): Promise<FetchResponse> {
       body =
         status === 304
           ? Buffer.alloc(0)
-          : await readBody(response, request.maxBytes ?? MAX_BODY_BYTES, hop);
+          : await readBody(
+              response,
+              request.maxBytes ??
+                (isTextMediaType(mediaType(header(response.headers, "content-type")) ?? "")
+                  ? MAX_BODY_BYTES
+                  : MAX_STORED_BYTES),
+              hop,
+            );
     } catch (error) {
       throw failure(hop, error);
     }

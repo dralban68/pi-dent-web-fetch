@@ -69,6 +69,8 @@ test("4.2 an entry holds extracted.md, content.md and meta.json with every field
     "etag",
     "extractedSha256",
     "fetchedAt",
+    "fileBytes",
+    "fileName",
     "finalUrl",
     "lastModified",
     "reformat",
