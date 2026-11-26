@@ -1,6 +1,6 @@
 # WebFetch
 
-## 1. Scope
+## 1. Scope {#scope}
 
 This spec defines the `WebFetch` tool that the pi-dent-web-fetch extension registers: how it fetches an
 http or https URL, the network guard, the sanitizer that keeps hidden text out of the result, the
@@ -23,9 +23,9 @@ session's id through `sessionManager.getSessionId()`.
 
 In this spec, cwd means the context's `cwd` of the call.
 
-## 2. Tool
+## 2. Tool {#tool}
 
-### 2.1 Registration
+### 2.1 Registration {#registration}
 
 The extension MUST register exactly one tool, with `name` `WebFetch` and `label` `Web Fetch`.
 
@@ -40,7 +40,7 @@ The extension MUST register exactly one tool, with `name` `WebFetch` and `label`
 The schema MUST declare `minimum: 0` for `maxAgeHours`; the tool MUST also refuse a negative or
 non-finite `maxAgeHours` with the tool error `WebFetch: maxAgeHours must be a number of 0 or more`.
 
-### 2.2 Test seam
+### 2.2 Test seam {#test-seam}
 
 The library MUST provide a factory that builds the tool from these options:
 
@@ -61,9 +61,9 @@ MUST NOT set any option from a tool parameter, an environment variable or a conf
 > refuse; the seam lets them allow exactly that address and fake DNS answers, and keeps the cache
 > location tests out of the real home and temporary folders.
 
-## 3. Request
+## 3. Request {#request}
 
-### 3.1 URL validation
+### 3.1 URL validation {#url-validation}
 
 `execute` checks `url` in this order, and the first failure is the tool error shown:
 
@@ -73,7 +73,7 @@ MUST NOT set any option from a tool parameter, an environment variable or a conf
 
 These errors are raised before the cache is read, so no stale copy is served (4.5).
 
-### 3.2 Canonical URL
+### 3.2 Canonical URL {#canonical-url}
 
 The canonical URL is derived from the parsed URL:
 
@@ -87,7 +87,7 @@ The canonical URL is derived from the parsed URL:
 
 The tool MUST request the canonical URL, not the given one.
 
-### 3.3 Request headers
+### 3.3 Request headers {#request-headers}
 
 Every request, redirect hops included, MUST be a `GET` with these headers:
 
@@ -100,7 +100,7 @@ Every request, redirect hops included, MUST be a `GET` with these headers:
 A revalidation (4.4) also sends `If-None-Match: <etag>` when the entry's `etag` is not null, and
 `If-Modified-Since: <lastModified>` when its `lastModified` is not null, on every hop.
 
-### 3.4 Address guard
+### 3.4 Address guard {#address-guard}
 
 Before each connection, the tool MUST determine the addresses of the URL's host: the host itself
 when it is an IP literal, else every address `resolve` returns. It MUST refuse the hop when the host
@@ -128,7 +128,7 @@ again. A refused hop is the tool error
 > Note (non-normative): connecting to the checked address closes the gap where a second lookup
 > answers with a private address (DNS rebinding).
 
-### 3.5 Redirects
+### 3.5 Redirects {#redirects}
 
 The tool MUST NOT let the HTTP client follow redirects. A response with status 301, 302, 303, 307
 or 308 is a redirect: its `Location` is resolved against the hop's URL, and the result becomes the
@@ -142,7 +142,7 @@ next hop, checked by Section 3.4. At most 5 redirects are followed per call.
 
 The final URL is the URL of the hop whose response is not a redirect.
 
-### 3.6 Timeout, cancellation and size cap
+### 3.6 Timeout, cancellation and size cap {#timeout-and-cap}
 
 The whole call, from the first resolution to the last body byte of the last hop, MUST end within
 30 s; past it the tool error is `WebFetch: timed out after <limit> s fetching <canonical URL>`.
@@ -159,7 +159,7 @@ because binaries and PDFs are often larger. The cap follows the response's `Cont
 before the body is read. On the first byte past the cap the tool stops reading and fails with
 `WebFetch: response from <final URL> exceeds <cap> bytes; nothing was cached`.
 
-### 3.7 Responses
+### 3.7 Responses {#responses}
 
 | Final status                           | Outcome                                               |
 | -------------------------------------- | ----------------------------------------------------- |
@@ -170,7 +170,7 @@ before the body is read. On the first byte past the cap the tool stops reading a
 A network error (connection refused, reset, TLS failure, unknown `Content-Encoding`) is the tool
 error `WebFetch: fetching <hop URL> failed: <reason>`.
 
-### 3.8 Character decoding
+### 3.8 Character decoding {#character-decoding}
 
 The body of a text kind (5.2, 5.5, 5.7) is decoded with the `charset` parameter of `Content-Type`;
 for HTML without one, with the first `<meta charset>` or `<meta http-equiv="Content-Type">`
@@ -181,9 +181,9 @@ UTF-8.` (Section 9.1).
 The body of a stored file (5.8), a PDF (5.9) included, is not decoded: it is kept as the bytes
 after content decoding (3.6).
 
-## 4. Cache
+## 4. Cache {#cache}
 
-### 4.1 Location
+### 4.1 Location {#cache-location}
 
 Each call uses one cache directory, chosen once per call before the cache is read, and reads and
 writes entries in it only.
@@ -239,7 +239,7 @@ A path is under cwd when its path relative to cwd is not empty, does not start w
 segment and is not absolute. The display path of a file is its path relative to cwd, with `/`
 separators, when it is under cwd, else its absolute path.
 
-### 4.2 Entry layout
+### 4.2 Entry layout {#entry-layout}
 
 One entry per canonical URL, in the directory `<host>/<slug>-<hash>/` under the cache directory:
 
@@ -290,7 +290,7 @@ stored file when `fileName` is set) and `meta.json` parses with every field of t
 Otherwise the tool MUST treat the entry as absent, fetch, replace every file, and add the notice
 `The cache entry was unreadable and has been replaced.`
 
-### 4.3 Writing
+### 4.3 Writing {#writing}
 
 Each file MUST be written to a temporary file in the entry directory whose name starts with `.`
 and ends in `.tmp`, then renamed onto its final name, in the order `file.<ext>` when stored,
@@ -301,7 +301,7 @@ written file. A fetch writes the entry before any reformat starts; a reformat th
 `WebFetch: cannot write the cache entry <absolute entry path>: <reason>`, after the tool removes
 its temporary files.
 
-### 4.4 Freshness
+### 4.4 Freshness {#freshness}
 
 An entry's age is the current time minus `fetchedAt`. With `refresh` not `true`:
 
@@ -314,16 +314,16 @@ An entry's age is the current time minus `fetchedAt`. With `refresh` not `true`:
 With `refresh` `true`, the request carries no validator and its response replaces the entry. A call
 with no entry fetches without validators. A replaced or new entry is served with status `fetched`.
 
-### 4.5 Stale copy
+### 4.5 Stale copy {#stale-copy}
 
 When an entry exists and the call fails after the cache was read, for any reason in Sections 3.4
 to 3.8, 4.3 or 5.1 other than cancellation, the tool MUST serve the entry unchanged with status
 `stale` and the notice `Refetch failed (<error message>); serving the copy fetched at <fetchedAt>.`
 With no entry, the failure is the tool error itself.
 
-## 5. Content
+## 5. Content {#content}
 
-### 5.1 Content types
+### 5.1 Content types {#content-types}
 
 The media type is the `Content-Type` value before any `;`, trimmed and lowercased.
 
@@ -343,7 +343,7 @@ A body with no media type is the tool error `WebFetch: no media type from <final
 > Note (non-normative): the `+xml` suffix is deliberately not data text, so that SVG and other
 > XML-based images are stored as files (5.8); the XML-based data types are listed one by one.
 
-### 5.2 HTML pipeline
+### 5.2 HTML pipeline {#html-pipeline}
 
 The tool MUST process HTML in this order:
 
@@ -365,7 +365,7 @@ The extension MUST declare `@mozilla/readability`, `linkedom`, `turndown` and
 `@truto/turndown-plugin-gfm` at exact versions, so an install yields the same output for the same
 input.
 
-### 5.3 Conversion
+### 5.3 Conversion {#conversion}
 
 Conversion uses `turndown` with `headingStyle: "atx"`, `codeBlockStyle: "fenced"`,
 `bulletListMarker: "-"`, `emDelimiter: "_"`, `strongDelimiter: "**"` and `linkStyle: "inlined"`,
@@ -390,7 +390,7 @@ letter, `/`, `!` or `?` MUST be written as `\<`. The Markdown MUST contain no HT
 spans and code blocks. Leading and trailing white space of the result is removed, and a non-empty
 result ends with one line feed.
 
-### 5.4 Title
+### 5.4 Title {#title}
 
 For HTML, the title is the text of the `title` element read at step 2 of Section 5.2, else of the
 first `h1` of the sanitized document, each after text cleaning (6.4), with every white-space run collapsed to one space and the
@@ -403,7 +403,7 @@ text, with the `\<` rule of Section 5.3.
 
 When `extracted.md` is empty, the tool adds the notice `The page produced no text.`
 
-### 5.5 Markdown and plain-text bodies
+### 5.5 Markdown and plain-text bodies {#markdown-bodies}
 
 A Markdown or plain-text body is text-cleaned (6.4), and the HTML embedded in it is sanitized like
 a page, so that hidden HTML cannot carry text into the result and no raw HTML remains. For this
@@ -427,14 +427,14 @@ verbatim like a Markdown body's, and the rest of its text is kept as it is.
 6. The result is converted (5.3), each remaining placeholder giving back its Markdown text
    unchanged, then empty sections are removed (5.6) and text cleaning applied (6.4).
 
-### 5.6 Empty sections
+### 5.6 Empty sections {#empty-sections}
 
 A section is an ATX heading line (1 to 6 `#` followed by a space or the line end, outside fenced
 code) with the lines after it up to the next heading of the same or a higher level (fewer or equal
 `#`), or the end. A heading whose section holds no line other than empty lines and heading lines is
 removed, with the empty lines after it. A heading whose subsection holds content is not removed.
 
-### 5.7 Data text
+### 5.7 Data text {#data-text}
 
 A body of `application/json`, of any type ending `+json`, of `text/csv`, `text/xml`,
 `application/xml`, `application/rss+xml` or `application/atom+xml` is data text. It is decoded
@@ -446,7 +446,7 @@ no sections are removed. The result previews it like any text.
 > Markdown would let HTML-like XML tags reach the sanitizer and be rewritten or dropped, so their
 > structure is kept instead; the text cleaning of 6.4 still removes the invisible characters.
 
-### 5.8 Stored files
+### 5.8 Stored files {#stored-files}
 
 A body whose handling is a stored file (5.1) is saved into the cache entry unchanged, as the bytes
 after content decoding (3.6). The name is `file.<ext>`. The extension is the value the fixed map
@@ -476,7 +476,7 @@ context: the result names the file, its media type, its size and the status (9.1
 Section 5.4 for an empty `extracted.md` is not added for a stored file: the result's `File:` lines
 say where the body went, and Section 5.9 states the notices of a PDF.
 
-### 5.9 PDF
+### 5.9 PDF {#pdf}
 
 A body of `application/pdf` is stored per 5.8 (`file.pdf`), and its text is extracted.
 
@@ -531,14 +531,14 @@ empty line, and the text. Pages without text contribute nothing. The title is nu
 
 The result is Markdown: Section 7 (the reformat) applies to it as to an HTML page's Markdown.
 
-## 6. Sanitizer
+## 6. Sanitizer {#sanitizer}
 
 The sanitizer removes what a human reader of the rendered page would not see, so it cannot reach
 the model. It is deterministic: its only inputs are the document and the fixed lists below.
 Element and attribute names and attribute values are compared ASCII case-insensitively. A removed
 element is removed with all its descendants. The rules apply in the order of Sections 6.1 to 6.4.
 
-### 6.1 Removed elements
+### 6.1 Removed elements {#removed-elements}
 
 - Comments, processing instructions and CDATA sections.
 - Everything in `head`, the `title` element included, after step 2 of Section 5.2 read it.
@@ -552,7 +552,7 @@ element is removed with all its descendants. The rules apply in the order of Sec
 
 Removing `form` removes every `label` inside it; a `label` outside a form is kept.
 
-### 6.2 Hidden elements
+### 6.2 Hidden elements {#hidden-elements}
 
 An element is removed when any of these holds:
 
@@ -562,7 +562,7 @@ An element is removed when any of these holds:
 4. A token of its `class` (split on ASCII white space) or its whole `id` equals a token of
    Section 6.2.2.
 
-#### 6.2.1 Inline style
+#### 6.2.1 Inline style {#inline-style}
 
 The `style` value is split on `;`; each declaration on its first `:` into a property and a value,
 both trimmed and lowercased, with a trailing `!important` and the white space before it removed.
@@ -585,7 +585,7 @@ optional unit; units other than `%` count as lengths. The style hides the elemen
 | `left`, `top`, `right`, `bottom`, `margin-left`, `margin-top` | a length of -999 or less, or a percentage of -100% or less                                                                                         |
 | `color`                                                       | `transparent`, or an `rgba(`, `hsla(`, `rgb(` or `hsl(` value whose alpha is 0 or 0%, or a 4- or 8-digit hex colour whose alpha digits are all `0` |
 
-#### 6.2.2 Hidden-content tokens
+#### 6.2.2 Hidden-content tokens {#hidden-tokens}
 
 `a11y-hidden`, `assistive-text`, `cloak`, `d-none`, `element-hidden`, `element-invisible`,
 `hidden`, `hide`, `invisible`, `is-hidden`, `ng-hide`, `off-screen`, `offscreen`,
@@ -593,7 +593,7 @@ optional unit; units other than `%` count as lengths. The style hides the elemen
 `sr-only-focusable`, `u-hidden`, `ui-helper-hidden-accessible`, `visually-hidden`,
 `visually-hidden-focusable`, `visuallyhidden`.
 
-### 6.3 Attributes and URLs
+### 6.3 Attributes and URLs {#attributes-and-urls}
 
 - An `a` element's `href` is resolved against the base URL. When it does not resolve, or its scheme
   is not `http`, `https` or `mailto`, the `a` element is replaced by its children.
@@ -602,7 +602,7 @@ optional unit; units other than `%` count as lengths. The style hides the elemen
 - Every other attribute is removed: an element keeps only `href` on `a`, `src` and `alt` on `img`,
   and `open` on `dialog`, which reaches here only when it has one (6.1).
 
-### 6.4 Text cleaning
+### 6.4 Text cleaning {#text-cleaning}
 
 Text cleaning applies to every text node and every kept `alt` value in each sanitize pass, to the
 Markdown of Section 5.2, and to Markdown and plain-text bodies. It MUST remove:
@@ -617,7 +617,7 @@ U+0020. In a text node outside `pre`, each remaining run of white space is then 
 U+0020, and an `alt` value is also collapsed and trimmed; in Markdown and plain text, runs of
 U+0020 are kept.
 
-### 6.5 Known limits
+### 6.5 Known limits {#known-limits}
 
 Hiding done by a stylesheet or a script (a class rule in a `<style>` sheet, an element hidden at
 load) cannot be computed without a CSS engine. The tokens of Section 6.2.2 are the deterministic
@@ -627,13 +627,13 @@ approximation; text hidden by any other class is kept. Content of a closed `deta
 In a PDF, text hidden by its colour, white on white for example, is kept: checking colour needs
 rendering, which the tool does not do. Text in annotations and form fields is not extracted.
 
-## 7. Reformat
+## 7. Reformat {#reformat}
 
 The reformat has a second model fix the Markdown structure of `extracted.md`. Its output is
 accepted only chunk by chunk, where the exact-content check (7.5) proves it holds the same text,
 code and URLs, so the model can rearrange formatting but cannot add, drop or change content.
 
-### 7.1 Request and model
+### 7.1 Request and model {#reformat-model}
 
 A call requests the reformat when its `reformat` parameter is `true`, or is absent while
 `web.reformat` (Section 8) is `true`. The reformat model string is `web.reformatModel`. It MUST be
@@ -652,7 +652,7 @@ and add the notice `Reformat skipped: <reason>.`, the reasons being:
 | Parsing or resolution fails                | `reformat model <string> cannot be resolved: <error message>` |
 | `hasConfiguredAuth` is false for the model | `reformat model <string> has no configured auth`              |
 
-### 7.2 Reuse
+### 7.2 Reuse {#reuse}
 
 After Section 4 has produced the entry to serve, with any status, a requested reformat compares
 the entry's `reformat` with the reformat model string and `extractedSha256`:
@@ -668,7 +668,7 @@ the entry's `reformat` with the reformat model string and `extractedSha256`:
 The reformat uses no network access other than the completions, and then writes `content.md` and
 `meta.json` per Section 4.3. A call that does not request the reformat serves the entry as stored.
 
-### 7.3 Chunks
+### 7.3 Chunks {#chunks}
 
 `extracted.md` is split into blocks: maximal runs of lines separated by one or more lines holding
 only white space, where a fenced code block (7.5, step 1) never spans two blocks. The chunk budget
@@ -682,7 +682,7 @@ Chunks are reformatted one at a time, in order. At most 32 chunks are sent; ever
 kept with reason `chunk limit`. The new `content.md` is every chunk, reformatted or kept, in order,
 joined by an empty line, with one line feed at the end.
 
-### 7.4 Completion
+### 7.4 Completion {#completion}
 
 Each chunk is one tool-free completion through `modelRegistry.streamSimple`, with the system prompt
 below, one user message holding the chunk, a token limit of the model's `maxTokens`, the reasoning
@@ -699,7 +699,7 @@ string is empty, `markdown` or `md`, and its last non-empty line closes that fen
 removed; the result is trimmed. Cancellation by the call's abort signal ends the call with the tool
 error `WebFetch: cancelled` and leaves `content.md` and `meta.json` as they were.
 
-### 7.5 Exact-content check
+### 7.5 Exact-content check {#exact-content-check}
 
 The reduction of a Markdown text is the triple (code list, URL list, text), computed in this order:
 
@@ -754,7 +754,7 @@ output that drops a separator, or splits a cell back into a list, fails the text
 > Note (non-normative): the text check fixes the order of all text, fence contents included, so a
 > new fence can only wrap lines where they stand; removing or changing a fence fails the code check.
 
-### 7.6 Kept chunks
+### 7.6 Kept chunks {#kept-chunks}
 
 A chunk that does not pass, or whose completion fails, is kept as it was in `extracted.md`, with
 the first reason that applies, in this order:
@@ -771,7 +771,7 @@ the first reason that applies, in this order:
 | `links changed` | The URL lists differ                                          |
 | `text changed`  | The texts differ                                              |
 
-## 8. Configuration
+## 8. Configuration {#configuration}
 
 This specification contributes the root key `web` to pi-dent's configuration file
 (pi-dent-agent `specs/config-file.md`, Section 2):
@@ -800,9 +800,9 @@ The same read also yields the merged `modelClasses` value, pi-dent's root key ([
 model-string], Section 3), used by Section 7.1 only; a value that is not an object counts as
 absent.
 
-## 9. Result
+## 9. Result {#result}
 
-### 9.1 Text
+### 9.1 Text {#result-text}
 
 The result's one text part is, line by line, the optional lines included only when they apply:
 
@@ -837,7 +837,7 @@ shortened by one when the cut would split a surrogate pair; the last line is pre
 characters remain, `<remaining>` being the length minus the preview's length. A notice is a
 sentence the tool adds to state a fallback or a recovered problem.
 
-### 9.2 Details
+### 9.2 Details {#details}
 
 `details` is an object with `status`, `path` and `extractedPath` (the display paths of
 `content.md` and `extracted.md`, 4.1), `absolutePath`, `cacheDir` (the absolute cache directory),
@@ -847,12 +847,12 @@ the notice strings) and `file`, null when the entry stores no file, else an obje
 `absolutePath` (the stored file's display and absolute paths), `contentType` (the value as
 received) and `bytes` (its size, `fileBytes` of Section 4.2).
 
-### 9.3 Rendering
+### 9.3 Rendering {#rendering}
 
 `renderCall` shows `WebFetch` and the `url` parameter; `renderResult` shows the status and the
 relative path, or the error message.
 
-## 10. Tests
+## 10. Tests {#tests}
 
 The repository's tests MUST NOT reach the internet: HTTP tests use a local `node:http` server
 through the seam of Section 2.2. For each rule of Section 6 (each element, attribute, style row and
@@ -902,7 +902,7 @@ that differs from the info string, and a label line with other text in it, each 
 `text changed`; and an input fence that already has a language not letting the output drop an
 unrelated line before it.
 
-## 11. Normative references
+## 11. Normative references {#normative-references}
 
 - [WHATWG URL] URL Living Standard: URL parsing, serialisation and the host parser.
 - [RFC 9110] HTTP Semantics: Sections 13.1.1 (`If-None-Match`) and 13.1.3 (`If-Modified-Since`),
@@ -915,7 +915,7 @@ unrelated line before it.
 - [pi-dent model-string] pi-dent-agent `specs/model-string.md`: Sections 1 to 4, the model string
   grammar, model classes, resolution, `fallback` and thinking precedence.
 
-## 12. Specification gaps
+## 12. Specification gaps {#specification-gaps}
 
 - Readability's behaviour is fixed by its pinned version, not by this spec; a version bump can
   change extraction output.
