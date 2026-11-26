@@ -142,11 +142,13 @@ terms:
     meaning: "One message reported to the user about a configuration, discovery, or catalog problem, or about a failure at run time that has no tool result to carry it"
     owner: "../pi-dent-agent/specs/config-file.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: display-path
     label: display path
     meaning: "A file's path relative to cwd with / separators when it is under cwd, else its absolute path."
@@ -204,11 +206,13 @@ terms:
     meaning: The reserved model class that absorbs a resolution miss
     owner: "../pi-dent-agent/specs/model-string.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: fetch-status
     label: fetch status
     meaning: "How a call served its entry: fetched, cached, revalidated or stale."
@@ -310,11 +314,13 @@ terms:
     meaning: One of the configuration file positions merged into the configuration
     owner: "../pi-dent-agent/specs/config-file.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: location-value
     label: location value
     meaning: "A trimmed cache location string, project, session or a folder path, that chooses the cache directory."
@@ -366,21 +372,25 @@ terms:
     meaning: A configured name that resolution maps to a model
     owner: "../pi-dent-agent/specs/model-string.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: model-string
     label: model string
     meaning: The single string grammar that selects a model wherever a model is named
     owner: "../pi-dent-agent/specs/model-string.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: notice
     label: notice
     meaning: A sentence the tool adds to its result to state a fallback or a recovered problem.
@@ -396,11 +406,13 @@ terms:
     meaning: The layer a configuration key is attributed to
     owner: "../pi-dent-agent/specs/config-file.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: page-section
     label: page section
     meaning: "The `## Page n` heading and text that one PDF page with text contributes to extracted.md."
@@ -508,11 +520,13 @@ terms:
     meaning: "A top-level key of pi-dent.conf, owned by the pi-dent spec or sibling package that defines its value"
     owner: "../pi-dent-agent/specs/config-file.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: sanitizer
     label: sanitizer
     meaning: "The deterministic pass that removes from a page everything a human reader of the rendered page would not see, so it cannot reach the model."
@@ -632,33 +646,39 @@ terms:
     meaning: The effort setting a model string can carry and a model can support
     owner: "../pi-dent-agent/specs/model-string.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: tool-error
     label: tool error
     meaning: A tool result with isError true
     owner: "../pi-dent-agent/specs/task.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     distinguish:
       - tool-result
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: tool-result
     label: tool result
     meaning: "The result a tool call returns to the model: its content, details and error flag"
     owner: "../pi-dent-agent/specs/task.md"
     group: pi-dent
-    key: shared
+    key: confusable
     status: active
     history:
       - date: 2026-11-26
         op: add
+      - date: 2026-11-26
+        op: update
   - id: under-cwd
     label: under cwd
     meaning: "Said of a path whose path relative to cwd is not empty, starts with no .. segment and is not absolute."
