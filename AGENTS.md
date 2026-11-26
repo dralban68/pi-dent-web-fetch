@@ -32,3 +32,5 @@ pi -ne -e ./      # run pi with only this extension loaded
 - No tracked file holds an absolute home path or the user's name, except the publishing fields of
   `package.json`; write `<absolute path of …>`. `test/no-personal-paths.test.ts` enforces it.
 - pi-dent-web owns the `WebFetch` tool and the cache directory `.pi/web-cache/`.
+- Published to npm, so `package.json` is not `private`: the one accepted dx audit finding, as in
+  pi-dent-terms. pi-dent-agent bundles this package at an exact version.
