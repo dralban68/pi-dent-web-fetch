@@ -25,8 +25,8 @@ cannot steer the agent into the local network.
 - **Anything else** is saved unchanged as `file.<ext>` in the cache entry; the result gives its
   path, type and size, never its bytes. A **PDF** is saved too, and its text extracted, one
   `## Page n` section per page, without invisible, sub-1 pt or off-page text.
-- **Cache:** one folder per URL, `<host>/<slug>-<hash>/`, holding `content.md`, `extracted.md`,
-  `meta.json` and any stored file. A fresh entry is served with no network access; an older one is
+- **Cache:** one folder per URL, `<host>/<slug>-<hash>/`, holding `content.md`, `meta.json`
+  and any stored file, plus `extracted.md`, the text before the reformat, when a reformat changed it. A fresh entry is served with no network access; an older one is
   revalidated with its `ETag` or `Last-Modified`; if a refetch fails, the old copy is served as
   `stale`.
 - **Reformat (optional):** a second model fixes the Markdown's structure; a chunk is accepted only

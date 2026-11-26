@@ -5,6 +5,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
 
+import { sha256 } from "../lib/cache.ts";
 import { call, html, resultText, startServer, tempDir, text } from "./helpers.ts";
 
 const PAGE = `<article><h1>Cached</h1><p>${"Text worth caching for later reading. ".repeat(10)}</p></article>`;
@@ -39,7 +40,7 @@ test("4.1 leaves an existing cache .gitignore and the project's own unchanged", 
   await assert.rejects(readFile(join(cwd, ".gitignore")), { code: "ENOENT" });
 });
 
-test("4.2 an entry holds extracted.md, content.md and meta.json with every field", async (t) => {
+test("4.2 an unreformatted entry holds content.md and meta.json with every field, no extracted.md", async (t) => {
   const server = await startServer(t);
   const cwd = await tempDir(t);
   server.route("/doc", (_req, res) => {
@@ -58,9 +59,9 @@ test("4.2 an entry holds extracted.md, content.md and meta.json with every field
     new RegExp(`^\\.pi/web-cache/127\\.0\\.0\\.1_${port}/doc-[0-9a-f]{8}/content\\.md$`),
   );
   assert.equal(details.absolutePath, join(cwd, details.path));
-  assert.equal(details.extractedPath, details.path.replace("content.md", "extracted.md"));
+  assert.equal(details.extractedPath, details.path);
   const dir = join(cwd, details.path, "..");
-  assert.deepEqual((await readdir(dir)).toSorted(), ["content.md", "extracted.md", "meta.json"]);
+  assert.deepEqual((await readdir(dir)).toSorted(), ["content.md", "meta.json"]);
   const meta = await readMeta(cwd, details.path);
   assert.deepEqual(Object.keys(meta).toSorted(), [
     "bytes",
@@ -87,10 +88,7 @@ test("4.2 an entry holds extracted.md, content.md and meta.json with every field
   assert.equal(meta.title, "Doc");
   assert.equal(meta.reformat, null);
   assert.match(String(meta.fetchedAt), /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/);
-  assert.equal(
-    await readFile(join(dir, "content.md"), "utf8"),
-    await readFile(join(dir, "extracted.md"), "utf8"),
-  );
+  assert.equal(sha256(await readFile(join(dir, "content.md"), "utf8")), meta.extractedSha256);
 });
 
 test("4.2 URLs with one canonical form share one entry", async (t) => {
@@ -223,11 +221,10 @@ test("9.1 the result lists the paths, status, title, URL, date, length, and a pr
   const result = await call(cwd, { url: `${server.origin}/long` });
   const lines = resultText(result).split("\n");
   const { details } = result;
-  assert.deepEqual(lines.slice(0, 10), [
+  assert.deepEqual(lines.slice(0, 9), [
     "WebFetch: fetched",
     `Path: ${details.path}`,
     `Absolute path: ${details.absolutePath}`,
-    `Extracted: ${details.extractedPath}`,
     "Title: Long",
     `URL: ${server.origin}/long`,
     `Fetched at: ${details.fetchedAt}`,

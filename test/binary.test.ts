@@ -100,7 +100,7 @@ test("5.8 a hostile Content-Disposition cannot name the file, escape the entry, 
   const files = await readdir(dir);
   assert.deepEqual(
     files.filter((name) => !name.startsWith(".")),
-    ["content.md", "extracted.md", "file.bin", "meta.json"],
+    ["content.md", "file.bin", "meta.json"],
   );
   const meta = await readFile(join(dir, "meta.json"), "utf8");
   assert.ok(!meta.includes("pwned"));

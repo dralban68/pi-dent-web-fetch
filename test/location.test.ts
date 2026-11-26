@@ -71,7 +71,8 @@ test("4.1 a relative folder path resolves against cwd, with a .gitignore and cwd
   const lines = resultText(result).split("\n");
   assert.equal(lines[1], `Path: ${details.path}`);
   assert.equal(lines[2], `Absolute path: ${details.absolutePath}`);
-  assert.equal(lines[3], `Extracted: ${details.path.replace("content.md", "extracted.md")}`);
+  assert.equal(details.extractedPath, details.path, "no reformat: content.md is the extraction");
+  assert.ok(!lines.some((line) => line.startsWith("Extracted: ")));
   assert.match(lines.at(-1) ?? "", new RegExp(`read the rest from ${details.path}\\]$`));
   assert.equal(await exists(join(d.cwd, ".pi")), false);
 });
@@ -85,11 +86,10 @@ test("9.1 a cache outside cwd shows absolute paths and no Path line", async (t) 
   assert.equal(details.cacheDir, folder);
   assert.ok(details.absolutePath.startsWith(`${folder}/`));
   assert.equal(details.path, details.absolutePath);
-  assert.equal(details.extractedPath, join(details.absolutePath, "..", "extracted.md"));
+  assert.equal(details.extractedPath, details.absolutePath);
   const lines = resultText(result).split("\n");
   assert.equal(lines[0], "WebFetch: fetched");
   assert.equal(lines[1], `Absolute path: ${details.absolutePath}`);
-  assert.equal(lines[2], `Extracted: ${details.extractedPath}`);
   assert.ok(!lines.some((line) => line.startsWith("Path: ")));
   assert.match(lines.at(-1) ?? "", new RegExp(`read the rest from ${details.absolutePath}\\]$`));
   assert.equal(await readFile(join(folder, ".gitignore"), "utf8"), "*\n");

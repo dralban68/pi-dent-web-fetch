@@ -215,9 +215,7 @@ export async function readEntry(paths: EntryPaths): Promise<Entry | "absent" | "
   if (metaText === undefined && extractedText === undefined && contentText === undefined) {
     return "absent";
   }
-  if (metaText === undefined || extractedText === undefined || contentText === undefined) {
-    return "unreadable";
-  }
+  if (metaText === undefined || contentText === undefined) return "unreadable";
   let parsed: unknown;
   try {
     parsed = JSON.parse(metaText);
@@ -228,7 +226,39 @@ export async function readEntry(paths: EntryPaths): Promise<Entry | "absent" | "
   const meta = normalizeMeta(parsed);
   const name: string | null = meta.fileName ?? null;
   if (name !== null && !(await isFile(filePath(paths.dir, name)))) return "unreadable";
-  return { meta, extracted: extractedText, content: contentText };
+  // specs/web-fetch.md#entry-layout: without extracted.md, content.md is the extraction.
+  if (extractedText === undefined && sha256(contentText) !== meta.extractedSha256) {
+    return "unreadable";
+  }
+  return { meta, extracted: extractedText ?? contentText, content: contentText };
+}
+
+/**
+ * Writes an entry's files (specs/web-fetch.md#writing): the stored file, `extracted.md` only
+ * when the extraction differs from `content.md`, `content.md` and `meta.json`, then removes an
+ * `extracted.md` that would equal `content.md`.
+ */
+export async function writeEntryFiles(
+  location: CacheLocation,
+  paths: EntryPaths,
+  entry: { extracted: string; content: string; meta: string; file?: readonly [string, Buffer] },
+): Promise<void> {
+  const separate = entry.extracted !== entry.content;
+  await writeEntry(location, paths, [
+    ...(entry.file === undefined ? [] : [entry.file]),
+    ...(separate ? [[paths.extracted, entry.extracted] as const] : []),
+    [paths.content, entry.content],
+    [paths.meta, entry.meta],
+  ]);
+  if (separate) return;
+  try {
+    await rm(paths.extracted, { force: true });
+  } catch (error) {
+    throw new WebFetchError(
+      "fetch",
+      `WebFetch: cannot write the cache entry ${paths.dir}: ${errorMessage(error)}`,
+    );
+  }
 }
 
 async function isFile(path: string): Promise<boolean> {

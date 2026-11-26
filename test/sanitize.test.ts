@@ -1,6 +1,6 @@
 /**
  * specs/web-fetch.md#sanitizer, specs/web-fetch.md#tests: each sanitizer rule is shown with a page that hides
- * `INJECTION-<rule>` that way; the string must be absent from extracted.md, content.md and the
+ * `INJECTION-<rule>` that way; the string must be absent from the extraction, content.md and the
  * result, while the visible text around it stays.
  */
 
@@ -27,10 +27,9 @@ async function fetchHidden(t: Parameters<typeof tempDir>[0], hidden: string, hea
     ),
   );
   const result = await call(cwd, { url: `${server.origin}/page` });
-  const dir = join(cwd, result.details.path, "..");
   return {
-    extracted: await readFile(join(dir, "extracted.md"), "utf8"),
-    content: await readFile(join(dir, "content.md"), "utf8"),
+    extracted: await readFile(join(cwd, result.details.extractedPath), "utf8"),
+    content: await readFile(join(cwd, result.details.path), "utf8"),
     result: resultText(result),
   };
 }

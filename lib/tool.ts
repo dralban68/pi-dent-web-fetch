@@ -18,7 +18,7 @@ import {
   readEntry,
   serializeMeta,
   sha256,
-  writeEntry,
+  writeEntryFiles,
   type Entry,
   type EntryPaths,
   type Meta,
@@ -177,7 +177,7 @@ function resultText(
           `Absolute file: ${file.absolutePath}`,
           `File type: ${file.contentType}`,
         ]),
-    `Extracted: ${details.extractedPath}`,
+    ...(details.extractedPath === details.path ? [] : [`Extracted: ${details.extractedPath}`]),
     `Title: ${details.title ?? "(none)"}`,
     `URL: ${details.finalUrl}`,
     `Fetched at: ${details.fetchedAt}`,
@@ -220,7 +220,11 @@ async function fetchAndStore(
   const now = new Date().toISOString();
   if (response.status === 304 && previous !== undefined) {
     const meta: Meta = { ...previous.meta, fetchedAt: now };
-    await writeEntry(location, paths, [[paths.meta, serializeMeta(meta)]]);
+    await writeEntryFiles(location, paths, {
+      extracted: previous.extracted,
+      content: previous.content,
+      meta: serializeMeta(meta),
+    });
     return { entry: { ...previous, meta }, status: "revalidated" };
   }
   const kind = contentKind(response.contentType, response.finalUrl);
@@ -262,12 +266,12 @@ async function fetchAndStore(
       extractedSha256: sha256(markdown),
       reformat: null,
     };
-    await writeEntry(location, paths, [
-      [filePath(paths.dir, fileName), response.body],
-      [paths.extracted, markdown],
-      [paths.content, markdown],
-      [paths.meta, serializeMeta(meta)],
-    ]);
+    await writeEntryFiles(location, paths, {
+      file: [filePath(paths.dir, fileName), response.body],
+      extracted: markdown,
+      content: markdown,
+      meta: serializeMeta(meta),
+    });
     return { entry: { meta, extracted: markdown, content: markdown }, status: "fetched" };
   }
   const decoded = decodeBody(response.body, response.contentType, kind);
@@ -290,11 +294,11 @@ async function fetchAndStore(
     extractedSha256: sha256(result.markdown),
     reformat: null,
   };
-  await writeEntry(location, paths, [
-    [paths.extracted, result.markdown],
-    [paths.content, result.markdown],
-    [paths.meta, serializeMeta(meta)],
-  ]);
+  await writeEntryFiles(location, paths, {
+    extracted: result.markdown,
+    content: result.markdown,
+    meta: serializeMeta(meta),
+  });
   return {
     entry: { meta, extracted: result.markdown, content: result.markdown },
     status: "fetched",
@@ -342,10 +346,11 @@ async function applyReformat(
     signal,
   });
   const next: Meta = { ...meta, reformat: result.meta };
-  await writeEntry(location, paths, [
-    [paths.content, result.content],
-    [paths.meta, serializeMeta(next)],
-  ]);
+  await writeEntryFiles(location, paths, {
+    extracted: served.extracted,
+    content: result.content,
+    meta: serializeMeta(next),
+  });
   return { meta: next, extracted: served.extracted, content: result.content };
 }
 
@@ -429,7 +434,8 @@ export async function runWebFetch(
   const details: WebFetchDetails = {
     status: served.status,
     path: paths.displayContent,
-    extractedPath: paths.displayExtracted,
+    extractedPath:
+      final.extracted === final.content ? paths.displayContent : paths.displayExtracted,
     absolutePath: paths.content,
     cacheDir: location.dir,
     url: params.url,

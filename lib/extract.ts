@@ -19,6 +19,16 @@ export const MIN_ARTICLE_CHARS = 200;
 export const NOTICE_FALLBACK =
   "Main-content extraction found too little text; the whole page body is used.";
 export const NOTICE_EMPTY = "The page produced no text.";
+export const NOTICE_TITLE_ONLY =
+  "The page produced no text beyond its title; it may be rendered by a script.";
+
+/** specs/web-fetch.md#title: the notice for an extraction that is empty or only its title heading. */
+export function emptyNotices(markdown: string): string[] {
+  const lines = markdown.split("\n").filter((line) => line.trim() !== "");
+  if (lines.length === 0) return [NOTICE_EMPTY];
+  if (lines.length === 1 && lines[0]?.startsWith("# ") === true) return [NOTICE_TITLE_ONLY];
+  return [];
+}
 
 export interface Extracted {
   readonly markdown: string;
@@ -166,7 +176,7 @@ export function extractHtml(html: string, finalUrl: string): Extracted {
     root = fresh.body ?? fresh.documentElement;
   }
   const markdown = addHeading(cleanText(dropEmptySections(toMarkdown(root))), title);
-  if (markdown.trim() === "") notices.push(NOTICE_EMPTY);
+  notices.push(...emptyNotices(markdown));
   return { markdown, title, notices };
 }
 
@@ -246,6 +256,6 @@ export function extract(kind: ContentKind, text: string, finalUrl: string): Extr
     return { markdown: "", title: null, notices: [] };
   }
   const markdown = markdownBody(cleanText(text), finalUrl);
-  const notices = markdown.trim() === "" ? [NOTICE_EMPTY] : [];
+  const notices = emptyNotices(markdown);
   return { markdown, title: kind === "markdown" ? markdownTitle(markdown) : null, notices };
 }
