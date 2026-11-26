@@ -94,7 +94,7 @@ Every request, redirect hops included, MUST be a `GET` with these headers:
 | Header            | Value                                                                                 |
 | ----------------- | ------------------------------------------------------------------------------------- |
 | `User-Agent`      | `pi-dent-web-fetch/<package version> (+<package homepage>)`, both from `package.json` |
-| `Accept`          | `text/markdown, text/html;q=0.9, text/plain;q=0.8`                                    |
+| `Accept`          | `text/markdown, text/html;q=0.9, text/plain;q=0.8, application/pdf;q=0.7`             |
 | `Accept-Encoding` | `gzip, deflate, br`                                                                   |
 
 A revalidation (4.4) also sends `If-None-Match: <etag>` when the entry's `etag` is not null, and
@@ -146,12 +146,18 @@ The final URL is the URL of the hop whose response is not a redirect.
 
 The whole call, from the first resolution to the last body byte of the last hop, MUST end within
 30 s; past it the tool error is `WebFetch: timed out after <limit> s fetching <canonical URL>`.
+PDF text extraction (5.9) shares this budget: it MUST end within 30 s of the call's first
+resolution, minus the time the fetch took.
+
 An aborted signal stops the call with the tool error `WebFetch: cancelled`, writes nothing and
 serves no stale copy.
 
 The response body, counted in bytes after content decoding (`gzip`, `deflate`, `br`), MUST NOT
-exceed 10485760 bytes (10 MiB, inclusive). On the first byte past the cap the tool stops reading
-and fails with `WebFetch: response from <final URL> exceeds <cap> bytes; nothing was cached`.
+exceed its cap: 10485760 bytes (10 MiB, inclusive) when the media type is one of the text kinds of
+Section 5.1 (HTML, Markdown, plain text, data text), else 52428800 bytes (50 MiB, inclusive),
+because binaries and PDFs are often larger. The cap follows the response's `Content-Type` header,
+before the body is read. On the first byte past the cap the tool stops reading and fails with
+`WebFetch: response from <final URL> exceeds <cap> bytes; nothing was cached`.
 
 ### 3.7 Responses
 
@@ -166,10 +172,14 @@ error `WebFetch: fetching <hop URL> failed: <reason>`.
 
 ### 3.8 Character decoding
 
-The body is decoded with the `charset` parameter of `Content-Type`; for HTML without one, with the
-first `<meta charset>` or `<meta http-equiv="Content-Type">` charset in the first 1024 bytes; else
-as UTF-8. Invalid sequences become U+FFFD. A label the decoder does not know is decoded as UTF-8
-and adds the notice `Unknown charset <label>; decoded as UTF-8.` (Section 9.1).
+The body of a text kind (5.2, 5.5, 5.7) is decoded with the `charset` parameter of `Content-Type`;
+for HTML without one, with the first `<meta charset>` or `<meta http-equiv="Content-Type">`
+charset in the first 1024 bytes; else as UTF-8. Invalid sequences become U+FFFD. A label the
+decoder does not know is decoded as UTF-8 and adds the notice `Unknown charset <label>; decoded as
+UTF-8.` (Section 9.1).
+
+The body of a stored file (5.8), a PDF (5.9) included, is not decoded: it is kept as the bytes
+after content decoding (3.6).
 
 ## 4. Cache
 
@@ -240,9 +250,10 @@ One entry per canonical URL, in the directory `<host>/<slug>-<hash>/` under the 
   again; `index` when empty.
 - `<hash>`: the first 8 hexadecimal digits, lowercase, of the SHA-256 of the canonical URL in UTF-8.
 
-The entry holds three files, in UTF-8:
+The entry holds three files in UTF-8, plus the stored file of Section 5.8 (`file.<ext>`, raw bytes)
+when the entry stores one (5.8, 5.9):
 
-- `extracted.md`: the output of Section 5.
+- `extracted.md`: the output of Section 5. Empty when the entry stores a file without text.
 - `content.md`: the served file; the output of Section 7 when the entry is reformatted, else a copy
   of `extracted.md`.
 - `meta.json`, a JSON object:
@@ -259,6 +270,8 @@ The entry holds three files, in UTF-8:
 | `lastModified`    | string or null | That response's `Last-Modified`                                                                                |
 | `title`           | string or null | Section 5.4                                                                                                    |
 | `bytes`           | number         | Body size per Section 3.6                                                                                      |
+| `fileName`        | string or null | The stored file's name (`file.<ext>`, 5.8), null when the entry stores no file                                 |
+| `fileBytes`       | number or null | The stored file's size in bytes, null when the entry stores no file                                            |
 | `extractedSha256` | string         | SHA-256 of `extracted.md`, 64 lowercase hexadecimal digits                                                     |
 | `reformat`        | object or null | null when `content.md` is a copy of `extracted.md`; else the object below                                      |
 
@@ -271,15 +284,18 @@ The entry holds three files, in UTF-8:
 | `kept`           | object | Chunks kept unreformatted, as a count per reason of Section 7.6; only reasons with a count of 1 or more                                               |
 | `parts`          | array  | One object per chunk, in order: `result`, `reformatted` or a reason of Section 7.6, and `length`, the characters of that chunk's text in `content.md` |
 
-An entry exists when all three files exist and `meta.json` parses with every field of the stated
-type. Otherwise the tool MUST treat the entry as absent, fetch, replace every file, and add the
-notice `The cache entry was unreadable and has been replaced.`
+An entry exists when each of its files exists (`meta.json`, `extracted.md`, `content.md`, and the
+stored file when `fileName` is set) and `meta.json` parses with every field of the stated type;
+`fileName` and `fileBytes` may also both be absent, for an entry written by an older version.
+Otherwise the tool MUST treat the entry as absent, fetch, replace every file, and add the notice
+`The cache entry was unreadable and has been replaced.`
 
 ### 4.3 Writing
 
 Each file MUST be written to a temporary file in the entry directory whose name starts with `.`
-and ends in `.tmp`, then renamed onto its final name, in the order `extracted.md`, `content.md`,
-`meta.json`; a file whose content does not change is not rewritten. A reader never sees a partly
+and ends in `.tmp`, then renamed onto its final name, in the order `file.<ext>` when stored,
+`extracted.md`, `content.md`, `meta.json`; a file whose content does not change is not rewritten.
+The stored file is written as bytes, the others as UTF-8 text. A reader never sees a partly
 written file. A fetch writes the entry before any reformat starts; a reformat then writes
 `content.md` and `meta.json` again. A failed write is the tool error
 `WebFetch: cannot write the cache entry <absolute entry path>: <reason>`, after the tool removes
@@ -311,12 +327,21 @@ With no entry, the failure is the tool error itself.
 
 The media type is the `Content-Type` value before any `;`, trimmed and lowercased.
 
-| Media type                           | Handling                                                                                                                                |
-| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
-| `text/html`, `application/xhtml+xml` | Section 5.2                                                                                                                             |
-| `text/markdown`, `text/x-markdown`   | Section 5.5                                                                                                                             |
-| `text/plain`                         | Section 5.5                                                                                                                             |
-| Any other, or no `Content-Type`      | Tool error `WebFetch: unsupported content type <media type or "none"> from <final URL>; only HTML, Markdown and plain text are fetched` |
+| Media type                                               | Handling                                    |
+| -------------------------------------------------------- | ------------------------------------------- |
+| `text/html`, `application/xhtml+xml`                     | The HTML pipeline (5.2)                     |
+| `text/markdown`, `text/x-markdown`, `text/plain`         | Markdown and plain-text bodies (5.5)        |
+| `application/json`, any type ending `+json`, `text/csv`, | Data text (5.7)                             |
+| `text/xml`, `application/xml`, `application/rss+xml`,    |                                             |
+| `application/atom+xml`                                   |                                             |
+| `application/pdf`                                        | A stored file and PDF text extraction (5.9) |
+| Any other                                                | A stored file (5.8)                         |
+| No `Content-Type`, or one without a media type           | Tool error                                  |
+
+A body with no media type is the tool error `WebFetch: no media type from <final URL>`.
+
+> Note (non-normative): the `+xml` suffix is deliberately not data text, so that SVG and other
+> XML-based images are stored as files (5.8); the XML-based data types are listed one by one.
 
 ### 5.2 HTML pipeline
 
@@ -408,6 +433,93 @@ A section is an ATX heading line (1 to 6 `#` followed by a space or the line end
 code) with the lines after it up to the next heading of the same or a higher level (fewer or equal
 `#`), or the end. A heading whose section holds no line other than empty lines and heading lines is
 removed, with the empty lines after it. A heading whose subsection holds content is not removed.
+
+### 5.7 Data text
+
+A body of `application/json`, of any type ending `+json`, of `text/csv`, `text/xml`,
+`application/xml`, `application/rss+xml` or `application/atom+xml` is data text. It is decoded
+(3.8), text-cleaned (6.4), and stored as `extracted.md` as it stands: it is not parsed as
+Markdown, its HTML-like constructs are not sanitized (5.5 does not apply), it has no title, and
+no sections are removed. The result previews it like any text.
+
+> Note (non-normative): JSON, CSV and XML are data the model reads directly. Parsing them as
+> Markdown would let HTML-like XML tags reach the sanitizer and be rewritten or dropped, so their
+> structure is kept instead; the text cleaning of 6.4 still removes the invisible characters.
+
+### 5.8 Stored files
+
+A body whose handling is a stored file (5.1) is saved into the cache entry unchanged, as the bytes
+after content decoding (3.6). The name is `file.<ext>`. The extension is the value the fixed map
+below gives for the media type; else the final URL's path extension, the run of 1 to 8 ASCII
+letters and digits after the last `.` of the last path segment, lowercased, when there is one; else
+`bin`.
+
+| Media type        | `<ext>` | Media type                     | `<ext>` |
+| ----------------- | ------- | ------------------------------ | ------- |
+| `application/pdf` | `pdf`   | `audio/mpeg`                   | `mp3`   |
+| `image/png`       | `png`   | `audio/wav`, `audio/x-wav`     | `wav`   |
+| `image/jpeg`      | `jpg`   | `audio/ogg`, `application/ogg` | `ogg`   |
+| `image/gif`       | `gif`   | `application/zip`              | `zip`   |
+| `image/webp`      | `webp`  | `application/gzip`             | `gz`    |
+| `image/avif`      | `avif`  | `application/x-gzip`           | `gz`    |
+| `image/bmp`       | `bmp`   | `application/x-tar`            | `tar`   |
+| `image/x-icon`    | `ico`   | `application/x-7z-compressed`  | `7z`    |
+| `image/svg+xml`   | `svg`   | `application/vnd.rar`          | `rar`   |
+| `video/mp4`       | `mp4`   | `application/wasm`             | `wasm`  |
+| `video/webm`      | `webm`  |                                |         |
+
+The stored name MUST NOT depend on a server-supplied filename: a `Content-Disposition` value and
+the URL's file name beyond its extension are never used for the path and never reach `meta.json`
+or the result. `meta.json` records the stored name in `fileName` and its size in bytes in
+`fileBytes`; `bytes` (3.6) and `fileBytes` are then equal. The body never enters the model
+context: the result names the file, its media type, its size and the status (9.1).
+
+### 5.9 PDF
+
+A body of `application/pdf` is stored per 5.8 (`file.pdf`), and its text is extracted.
+
+The extension MUST declare `unpdf` at an exact version, so an install yields the same output for
+the same input.
+
+> Note (non-normative): `unpdf` bundles PDF.js and requires Node 24 or later; this extension
+> already requires Node 26 or later (its `engines` field).
+
+At most the first 100 pages are extracted; a document with more pages gets the notice
+`PDF text extraction stopped at 100 pages.`, and the pages extracted are kept.
+
+Extraction shares the call's budget (3.6): it MUST end within 30 s of the call's first resolution,
+minus the time the fetch took. PDF.js ignores cancellation, so the extraction runs in a worker
+thread that the tool stops at that limit. Past the limit the worker is stopped, the pages extracted
+so far are kept, and the call adds the notice
+`PDF text extraction timed out; the pages extracted so far are kept.`
+
+On the call's abort signal the worker is stopped, nothing is written, and the call ends with the
+tool error `WebFetch: cancelled`. When the document does not parse, or the worker fails, the file
+is kept, `extracted.md` is empty, and the call adds the notice
+`PDF text extraction failed (<reason>); the file is kept without text.` These are not tool errors.
+When no page yields text, for example a scanned PDF, the file is kept, `extracted.md` is empty, and
+the call adds the notice `No text found in the PDF; the file is kept.`
+
+Each page's text comes from its PDF.js `getTextContent()` items. The tool pairs the page's items
+with the runs of the page's operator list (`getOperatorList()`), tracking the graphics state over
+save, restore, transform, form (`paintFormXObjectBegin`, whose argument matrix multiplies the
+current transformation matrix, and `paintFormXObjectEnd`), text matrix, next-line, text rise,
+font size and text render mode operators, to give each show-text run its origin in page space,
+its effective font size (the `Tf` size scaled by the text and transformation matrices) and its
+text render mode. Each non-empty item is paired with the run whose origin equals the item's origin
+within 1 pt; an item that pairs with no run is dropped. An item is dropped when its run has:
+
+- a text render mode of 3 (invisible) or 7 (add to clip path only), per [ISO 32000-2], 9.3.1;
+- an effective font size below 1 pt;
+- an origin outside the page's visible box (the crop box, else the media box), the box's edges
+  counting as inside.
+
+The kept items' strings of a page are joined in order with one space, each item's end-of-line flag
+becoming one line feed. Text cleaning (6.4) is applied. Each page whose cleaned text is not empty
+contributes one section: the heading `## Page <n>`, where `<n>` is the page's 1-based number, an
+empty line, and the text. Pages without text contribute nothing. The title is null.
+
+The result is Markdown: Section 7 (the reformat) applies to it as to an HTML page's Markdown.
 
 ## 6. Sanitizer
 
@@ -501,6 +613,9 @@ Hiding done by a stylesheet or a script (a class rule in a `<style>` sheet, an e
 load) cannot be computed without a CSS engine. The tokens of Section 6.2.2 are the deterministic
 approximation; text hidden by any other class is kept. Content of a closed `details` element and
 `alt` text are kept, because a reader can see them.
+
+In a PDF, text hidden by its colour, white on white for example, is kept: checking colour needs
+rendering, which the tool does not do. Text in annotations and form fields is not extracted.
 
 ## 7. Reformat
 
@@ -685,6 +800,9 @@ The result's one text part is, line by line, the optional lines included only wh
 WebFetch: <status>
 Path: <path of content.md relative to cwd, with / separators>
 Absolute path: <absolute path of content.md>
+File: <display path of the stored file> (<fileBytes> bytes)
+Absolute file: <absolute path of the stored file>
+File type: <the stored file's Content-Type value as received>
 Extracted: <display path of extracted.md>
 Title: <title, or (none)>
 URL: <final URL>
@@ -697,7 +815,9 @@ Reformat: <reformat state>
 [<remaining> more characters; read the rest from <display path of content.md>]
 ```
 
-The `Path:` line is present only when `content.md` is under cwd (4.1).
+The `Path:` line is present only when `content.md` is under cwd (4.1). The `File:`, `Absolute
+file:` and `File type:` lines are present only when the entry stores a file (5.8); `File:` gives
+the display path (4.1), so it is absolute when the file is outside cwd.
 
 `<status>` is `fetched`, `cached`, `revalidated` or `stale`. `<reformat state>` is `none` when the
 entry's `reformat` is null, else `<model>: <reformatted> of <chunks> chunks reformatted`, followed,
@@ -712,8 +832,10 @@ sentence the tool adds to state a fallback or a recovered problem.
 `details` is an object with `status`, `path` and `extractedPath` (the display paths of
 `content.md` and `extracted.md`, 4.1), `absolutePath`, `cacheDir` (the absolute cache directory),
 `url`, `canonicalUrl`, `finalUrl`, `title` (string or null), `fetchedAt`, `length` (number),
-`previewLength` (number), `reformat` (the entry's `reformat`, Section 4.2) and `notices` (array of
-the notice strings).
+`previewLength` (number), `reformat` (the entry's `reformat`, Section 4.2), `notices` (array of
+the notice strings) and `file`, null when the entry stores no file, else an object with `path` and
+`absolutePath` (the stored file's display and absolute paths), `contentType` (the value as
+received) and `bytes` (its size, `fileBytes` of Section 4.2).
 
 ### 9.3 Rendering
 
@@ -732,6 +854,19 @@ HTML block and inline, including an unclosed element and Markdown text between a
 and with a code span and a fenced code block holding `<div hidden>`, which MUST be kept verbatim.
 A plain-text body MUST be tested with a hidden `div`, an HTML comment, a `script` and a hidden-class
 token, and with a fenced code block holding `<div hidden>` kept verbatim.
+
+Stored-file and PDF tests serve fixtures from the local server. They MUST cover: a PNG and a zip
+stored byte-identical with the extension of the map (5.8); an `application/octet-stream` body whose
+extension falls back to the URL path's, and one without an extension stored as `file.bin`; a
+hostile `Content-Disposition` file name that cannot escape the entry folder or reach the result;
+the result's `File:`, `Absolute file:` and `File type:` lines; `meta.json`'s `fileName` and
+`fileBytes`; the 50 MiB cap on a large binary (3.6); cache freshness and revalidation for a binary
+entry; JSON and XML data text kept as cleaned text with their structure intact (5.7). PDF fixtures
+are built by a committed helper in the test tree, not by committed binary files, and cover: a text
+PDF whose extracted text is checked; one PDF hiding `INJECTION-<rule>` in each removable way of
+5.9 (an invisible render mode, a font size below the threshold, a position outside the page box),
+each absent from `extracted.md` and the result; a PDF with no text and a corrupt PDF, each kept
+with its notice; and a multi-page PDF whose `## Page n` sections are checked.
 
 Cache location tests MUST set `env`, `homeDir` and `tmpDir` through the seam of Section 2.2, and
 never write into the real home folder or the root of the system temporary folder. They MUST cover each value form (`project`,
@@ -763,6 +898,8 @@ unrelated line before it.
   15.4 (redirect status codes).
 - [RFC 6890] Special-Purpose IP Address Registries: the ranges of Section 3.4.
 - [Unicode] The Unicode Standard: general categories Cc and Cf, and the White_Space property.
+- [ISO 32000-2] PDF Reference, ISO 32000-2: the text rendering modes (9.3.1), the text matrices
+  and the rendering transform.
 - [CommonMark] CommonMark Spec, version 0.31.2: Sections 6.1 (code spans) and 6.6 (raw HTML).
 - [pi-dent model-string] pi-dent-agent `specs/model-string.md`: Sections 1 to 4, the model string
   grammar, model classes, resolution, `fallback` and thinking precedence.
@@ -791,6 +928,16 @@ unrelated line before it.
 - Query parameters are re-serialised as `application/x-www-form-urlencoded`, so a canonical URL
   can differ in encoding from the given one (`%20` becomes `+`, `?a` becomes `?a=`).
 - The cache is never pruned, and session cache folders are never removed by this extension.
+- PDF text comes from the document's text layer: pages scanned as images without an OCR layer, or
+  text converted to outlines, yield nothing; annotation and form-field text is not extracted.
+- An item that pairs with no operator-list run is dropped (5.9), so a construct the tracking of 5.9
+  does not model loses its text; two runs at nearly one origin can take each other's render mode,
+  size or position.
+- A document longer than 100 pages, or an extraction past the call's time budget, is extracted
+  partially, with a notice.
+- SVG and the other media types of the 5.8 map are stored, never decoded, cleaned or previewed.
+- `unpdf` bundles PDF.js; the extraction output is fixed by its pinned version, and a version bump
+  can change extraction output.
 - The refusal of Section 4.1 compares resolved paths as text: a symbolic link to cwd, the home
   folder or the root, or a path differing only in letter case on a case-insensitive file system, is
   not refused.
