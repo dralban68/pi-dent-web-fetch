@@ -1,0 +1,187 @@
+terms:
+  - id: address-guard
+    label: address guard
+    meaning: "The check before each connection that refuses localhost names and loopback, private, link-local and other blocked address ranges, and pins the connection to the checked address."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: cache-directory
+    label: cache directory
+    meaning: "The one folder a call reads and writes cache entries in, chosen from the cache parameter, PI_DENT_WEB_CACHE_DIR, web.cache or the project default."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    distinguish:
+      - cache-entry
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: update
+  - id: cache-entry
+    label: cache entry
+    meaning: "The folder holding one canonical URL's cached files: content.md, extracted.md, meta.json and any stored file."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: canonical-url
+    label: canonical URL
+    meaning: "The requested URL with its fragment and tracking parameters removed and the rest sorted, which names the cache entry and is the URL actually requested."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - final-url
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: data-text
+    label: data text
+    meaning: "A JSON, CSV or XML body, decoded and text-cleaned but stored as it stands, neither parsed as Markdown nor sanitized."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - stored-file
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: display-path
+    label: display path
+    meaning: "A file's path relative to cwd with / separators when it is under cwd, else its absolute path."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: effective-font-size
+    label: effective font size
+    meaning: "A run's Tf font size scaled by the PDF text and transformation matrices, below 1 pt of which its text is dropped."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: exact-content-check
+    label: exact-content check
+    meaning: "The comparison of a chunk's reduction before and after the reformat model, which accepts the output only when its text, code and URLs are unchanged."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: final-url
+    label: final URL
+    meaning: "The URL of the last hop of a fetch, the one whose response is not a redirect."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: hop
+    label: hop
+    meaning: "One request of a fetch: the first request, or one that follows a redirect, each checked by the address guard."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: notice
+    label: notice
+    meaning: A sentence the tool adds to its result to state a fallback or a recovered problem.
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: reformat
+    label: reformat
+    meaning: "The optional pass in which a second model fixes the Markdown structure of extracted.md, accepted chunk by chunk only where the exact-content check passes."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: sanitizer
+    label: sanitizer
+    meaning: "The deterministic pass that removes from a page everything a human reader of the rendered page would not see, so it cannot reach the model."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: show-text-run
+    label: show-text run
+    meaning: "One show-text operator of a PDF page's operator list, with the origin, effective font size, render mode and text that the tracked graphics state gives it."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+      - date: 2026-11-26
+        op: rename
+        from: run
+        to: show-text run
+      - date: 2026-11-26
+        op: update
+  - id: stale-copy
+    label: stale copy
+    meaning: "An existing cache entry served unchanged, with status stale and a notice, when a refetch fails."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: stored-file
+    label: stored file
+    meaning: "A response body that is not a text kind, saved unchanged in the cache entry as file.<ext> and never passed to the model."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: shared
+    status: active
+    history:
+      - date: 2026-11-26
+        op: add
+  - id: text-cleaning
+    label: text cleaning
+    meaning: "The removal of control, format and variation-selector characters and the mapping of other white space to one space, applied to every text the tool keeps."
+    owner: specs/web-fetch.md
+    group: WebFetch
+    key: local
+    status: active
+    distinguish:
+      - sanitizer
+    history:
+      - date: 2026-11-26
+        op: add
