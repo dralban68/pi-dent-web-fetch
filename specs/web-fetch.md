@@ -2,7 +2,7 @@
 
 ## 1. Scope
 
-This spec defines the `WebFetch` tool that the pi-dent-web extension registers: how it fetches an
+This spec defines the `WebFetch` tool that the pi-dent-web-fetch extension registers: how it fetches an
 http or https URL, the network guard, the sanitizer that keeps hidden text out of the result, the
 conversion to Markdown, the optional reformat by a second model with its exact-content check, the
 cache and its location, the configuration, and the tool result.
@@ -91,11 +91,11 @@ The tool MUST request the canonical URL, not the given one.
 
 Every request, redirect hops included, MUST be a `GET` with these headers:
 
-| Header            | Value                                                                           |
-| ----------------- | ------------------------------------------------------------------------------- |
-| `User-Agent`      | `pi-dent-web/<package version> (+<package homepage>)`, both from `package.json` |
-| `Accept`          | `text/markdown, text/html;q=0.9, text/plain;q=0.8`                              |
-| `Accept-Encoding` | `gzip, deflate, br`                                                             |
+| Header            | Value                                                                                 |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| `User-Agent`      | `pi-dent-web-fetch/<package version> (+<package homepage>)`, both from `package.json` |
+| `Accept`          | `text/markdown, text/html;q=0.9, text/plain;q=0.8`                                    |
+| `Accept-Encoding` | `gzip, deflate, br`                                                                   |
 
 A revalidation (4.4) also sends `If-None-Match: <etag>` when the entry's `etag` is not null, and
 `If-Modified-Since: <lastModified>` when its `lastModified` is not null, on every hop.
@@ -193,7 +193,7 @@ A value means, compared case-sensitively:
 | ------------- | ----------------------------------------------------------------------------------------------- |
 | `project`     | `<cwd>/.pi/web-cache/`                                                                          |
 | `session`     | `<PI_DENT_SESSION_DIR>/tmp/web-cache/` when `PI_DENT_SESSION_DIR` of `env` is set and not empty |
-| `session`     | otherwise `<tmpDir>/pi-dent-web/<session id>/`, and the call adds the notice below              |
+| `session`     | otherwise `<tmpDir>/pi-dent-web-fetch/<session id>/`, and the call adds the notice below        |
 | any other one | a folder path: `~` or a leading `~/` expanded to `homeDir`, then resolved against cwd           |
 
 `<PI_DENT_SESSION_DIR>` is resolved against cwd. `<session id>` is the call's
@@ -213,7 +213,7 @@ being `the working folder`, `the home folder` or `the filesystem root`.
 - A refused value from the variable or the setting is skipped, and the next source is used. The
   call adds the notice `<source> <problem>; it is ignored.`, where `<source>` is
   `PI_DENT_WEB_CACHE_DIR` or `<file>: web.cache`, `<file>` as in Section 8. When the call's context
-  has a UI, the tool MUST also report `pi-dent-web: <source> <problem>; it is ignored` through
+  has a UI, the tool MUST also report `pi-dent-web-fetch: <source> <problem>; it is ignored` through
   `notify` at level `warning`, once per distinct message per extension instance.
 
 The cache directory is created with its parents when absent. Before writing an entry, the tool MUST
@@ -669,7 +669,7 @@ non-empty string`, `<file>: web.cache must be a non-empty string` and
 `<file>: web has unknown keys <keys>`, `<keys>` being the unknown keys in ascending order joined
 by `, `, and `<file>` the owning layer's file (pi-dent-agent `specs/config-file.md`,
 Section 4). Each MUST be reported once per extension instance, at that `session_start` when the
-session has a UI, through `notify` at level `warning` as `pi-dent-web: <message>`.
+session has a UI, through `notify` at level `warning` as `pi-dent-web-fetch: <message>`.
 
 The same read also yields the merged `modelClasses` value, pi-dent's root key ([pi-dent
 model-string], Section 3), used by Section 7.1 only; a value that is not an object counts as
