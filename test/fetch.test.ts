@@ -1,6 +1,7 @@
 /** specs/web-fetch.md, Sections 3 and 5.1: the request, its guard and limits, and content types. */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { test } from "node:test";
@@ -8,6 +9,10 @@ import { gzipSync } from "node:zlib";
 
 import { MAX_BODY_BYTES, fetchPage } from "../lib/http.ts";
 import { call, html, resultText, startServer, tempDir, text } from "./helpers.ts";
+
+const VERSION: string = JSON.parse(
+  readFileSync(new URL("../package.json", import.meta.url), "utf8"),
+).version;
 
 const PAGE = `<article><h1>Doc</h1><p>${"Plain readable words for the page body. ".repeat(10)}</p></article>`;
 
@@ -19,7 +24,9 @@ test("3.3 sends GET with the User-Agent, Accept and Accept-Encoding headers", as
   assert.equal(req?.method, "GET");
   assert.match(
     req?.headers["user-agent"] ?? "",
-    /^pi-dent-web\/0\.1\.0 \(\+https:\/\/github\.com\/.+\/pi-dent-web#readme\)$/,
+    new RegExp(
+      `^pi-dent-web/${VERSION.replaceAll(".", "\\.")} \\(\\+https://github\\.com/.+/pi-dent-web#readme\\)$`,
+    ),
   );
   assert.equal(req?.headers.accept, "text/markdown, text/html;q=0.9, text/plain;q=0.8");
   assert.equal(req?.headers["accept-encoding"], "gzip, deflate, br");
