@@ -258,7 +258,7 @@ The media type is the `Content-Type` value before any `;`, trimmed and lowercase
 | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
 | `text/html`, `application/xhtml+xml` | Section 5.2                                                                                                                             |
 | `text/markdown`, `text/x-markdown`   | Section 5.5                                                                                                                             |
-| `text/plain`                         | Text cleaning (6.4) only                                                                                                                |
+| `text/plain`                         | Section 5.5                                                                                                                             |
 | Any other, or no `Content-Type`      | Tool error `WebFetch: unsupported content type <media type or "none"> from <final URL>; only HTML, Markdown and plain text are fetched` |
 
 ### 5.2 HTML pipeline
@@ -321,10 +321,12 @@ text, with the `\<` rule of Section 5.3.
 
 When `extracted.md` is empty, the tool adds the notice `The page produced no text.`
 
-### 5.5 Markdown bodies
+### 5.5 Markdown and plain-text bodies
 
-A Markdown body is text-cleaned (6.4), and the HTML embedded in it is sanitized like a page, so
-that hidden HTML cannot carry text into the result and no raw HTML remains:
+A Markdown or plain-text body is text-cleaned (6.4), and the HTML embedded in it is sanitized like
+a page, so that hidden HTML cannot carry text into the result and no raw HTML remains. For this
+purpose a plain-text body is read as Markdown: its code spans, fences and indented code stay
+verbatim like a Markdown body's, and the rest of its text is kept as it is.
 
 1. **Code.** Fenced code blocks (the fence rule of Section 7.5, step 1), indented code blocks (a
    run of lines indented by 4 or more spaces or a tab, starting at the body's start or after an
@@ -488,7 +490,7 @@ The reformat uses no network access other than the completions, and then writes 
 
 `extracted.md` is split into blocks: maximal runs of lines separated by one or more lines holding
 only white space, where a fenced code block (7.5, step 1) never spans two blocks. The chunk budget
-is the smaller of 2 × the model's `maxTokens` and 24000, in characters. Blocks are taken in order
+is the smaller of 2 × the model's `maxTokens` and 12000, in characters. Blocks are taken in order
 and appended to the current chunk, joined by an empty line, while its length stays within the
 budget (inclusive); a block beginning with a heading line (`#` to `######` followed by a space)
 starts a new chunk when the current one is at least half the budget long. A block longer than the
@@ -549,7 +551,16 @@ The code lists are matched in order: each output fence, taken in order, is match
 unmatched input fence when their contents are equal, else it is a new fence. The code check passes
 when every input fence is matched, and the content of every new fence equals, exactly, a run of
 one or more consecutive whole lines of the input chunk (split on line feeds); an empty new fence
-always matches.
+always matches. The corresponding content of an output fence is the matched input fence, or for a
+new fence the first such run of lines that starts at or after the end of the previous output
+fence's corresponding content (else the first such run in the chunk).
+
+A label line is folded into a fence: when an output fence's info string (the rest of its opening
+line after the fence characters, trimmed) is one word `w` with no white space, and the last
+non-empty input line before its corresponding content (before the opening line of a matched input
+fence) consists, trimmed, only of `w`, compared case-sensitively, that line is removed from the
+input before its text is reduced. Nothing else is folded: a line with any other text stays, and so
+does a line before a fence whose info string is not `w`.
 
 A chunk passes when the code check passes, the URL lists of the chunk and of the processed output
 (7.4) are equal once each is sorted by UTF-16 code units, and their texts are equal. The check MUST
@@ -657,6 +668,8 @@ token, and each character class of Section 6.4), a test MUST serve a page that h
 removal of Section 6.1 and each hiding method of Section 6.2 written as embedded HTML, both as an
 HTML block and inline, including an unclosed element and Markdown text between an element's tags;
 and with a code span and a fenced code block holding `<div hidden>`, which MUST be kept verbatim.
+A plain-text body MUST be tested with a hidden `div`, an HTML comment, a `script` and a hidden-class
+token, and with a fenced code block holding `<div hidden>` kept verbatim.
 Tests MUST cover an empty section removed (a heading followed only by the next heading), a
 heading kept because its subsection holds content, and a table cell holding a list and one holding
 a nested table.
@@ -667,7 +680,11 @@ added, dropped and reworded text, each rejected with `text changed`; a changed U
 fence accepted; a new fence that changes its inner text, and a removed fence, each rejected with
 `code changed`; a table from conversion reformatted and accepted; the skip notice when
 `web.reformatModel` is absent; a model class resolved; reuse of a cached reformat with no
-completion; and a retry that sends only the chunks lost to `model error` or `timed out`.
+completion; a retry that sends only the chunks lost to `model error` or `timed out`; a label line
+folded into a fence's info string (`html` and `css` before MDN-style code) accepted; a label word
+that differs from the info string, and a label line with other text in it, each rejected with
+`text changed`; and an input fence that already has a language not letting the output drop an
+unrelated line before it.
 
 ## 11. Normative references
 
@@ -696,7 +713,6 @@ completion; and a retry that sends only the chunks lost to `model error` or `tim
   list numbers at a line start, `#` runs at a line start, and table pipes, escaped pipes included.
 - A new fence must copy its lines exactly, escapes included, so a fence that also unescapes code
   is rejected.
-- A plain-text body gets text cleaning only.
 - In a Markdown body, text inside an HTML block stays Markdown, though CommonMark would render it
   as HTML; it is kept as text either way.
 - `xmp` and `plaintext` are removed though a browser shows their text: as raw-text elements they
