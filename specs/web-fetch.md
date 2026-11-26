@@ -383,8 +383,8 @@ optional unit; units other than `%` count as lengths. The style hides the elemen
   is not `http`, `https` or `mailto`, the `a` element is replaced by its children.
 - An `img` element's `src` is resolved against the base URL and kept only when its scheme is `http`
   or `https`.
-- Every other attribute is removed: an element keeps only `href` on `a`, and `src` and `alt` on
-  `img`.
+- Every other attribute is removed: an element keeps only `href` on `a`, `src` and `alt` on `img`,
+  and `open` on `dialog`, which reaches here only when it has one (6.1).
 
 ### 6.4 Text cleaning
 
@@ -398,7 +398,8 @@ Markdown of Section 5.2, and to Markdown and plain-text bodies. It MUST remove:
 
 It then replaces each run of White_Space characters other than U+0009, U+000A and U+0020 with one
 U+0020. In a text node outside `pre`, each remaining run of white space is then collapsed to one
-U+0020; in Markdown and plain text, runs of U+0020 are kept.
+U+0020, and an `alt` value is also collapsed and trimmed; in Markdown and plain text, runs of
+U+0020 are kept.
 
 ### 6.5 Known limits
 
@@ -652,4 +653,7 @@ completion; and a retry that sends only the chunks lost to `model error` or `tim
   list numbers at a line start, `#` runs at a line start, and table pipes, escaped pipes included.
 - A new fence must copy its lines exactly, escapes included, so a fence that also unescapes code
   is rejected.
+- A Markdown or plain-text body gets text cleaning only, so raw HTML in it reaches the result.
+- Query parameters are re-serialised as `application/x-www-form-urlencoded`, so a canonical URL
+  can differ in encoding from the given one (`%20` becomes `+`, `?a` becomes `?a=`).
 - The cache is never pruned.
