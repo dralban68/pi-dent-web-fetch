@@ -1,4 +1,4 @@
-/** specs/web-fetch.md, Sections 4 and 9: cache location, entries, freshness, stale copies, result. */
+/** specs/web-fetch.md#cache, specs/web-fetch.md#result: cache location, entries, freshness, stale copies, result. */
 
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";

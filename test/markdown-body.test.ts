@@ -1,5 +1,5 @@
 /**
- * specs/web-fetch.md, Sections 5.5 and 10: HTML embedded in a Markdown body is sanitized, as a
+ * specs/web-fetch.md#markdown-bodies, specs/web-fetch.md#tests: HTML embedded in a Markdown body is sanitized, as a
  * block and inline; hidden HTML takes the Markdown text inside it along; code is kept verbatim.
  */
 

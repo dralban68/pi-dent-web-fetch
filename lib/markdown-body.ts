@@ -1,5 +1,5 @@
 /**
- * Markdown bodies (specs/web-fetch.md, Section 5.5): the HTML embedded in a Markdown body is
+ * Markdown bodies (specs/web-fetch.md#markdown-bodies): the HTML embedded in a Markdown body is
  * sanitized like a page. Code is found first (fences, indented blocks, code spans), then the raw
  * HTML constructs of CommonMark 6.6 outside it; the Markdown text between them stands in the
  * parsed document as placeholder elements, so a removed element takes its Markdown text with it.
@@ -15,7 +15,7 @@ export type Token = { readonly html: boolean; readonly text: string };
 
 const FENCE_OPEN = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/;
 
-/** Code ranges [start, end) of fenced and indented code blocks (Section 5.5, step 1). */
+/** Code ranges [start, end) of fenced and indented code blocks (specs/web-fetch.md#markdown-bodies, step 1). */
 function blockCode(text: string): [number, number][] {
   const ranges: [number, number][] = [];
   const lines = text.split("\n");
@@ -71,7 +71,7 @@ const HTML = new RegExp(
   "y",
 );
 
-/** Splits a body into Markdown text and HTML constructs (Section 5.5, steps 1 and 2). */
+/** Splits a body into Markdown text and HTML constructs (specs/web-fetch.md#markdown-bodies, steps 1 and 2). */
 export function tokenize(text: string): Token[] {
   const code = blockCode(text);
   const tokens: Token[] = [];
@@ -130,7 +130,7 @@ export interface PlaceholderDocument {
 }
 
 /**
- * Section 5.5, steps 4 and 5: the sanitized document, or `undefined` when the body has no HTML.
+ * specs/web-fetch.md#markdown-bodies, steps 4 and 5: the sanitized document, or `undefined` when the body has no HTML.
  * The prefix is random per call, so a body cannot name a placeholder and bring back text that a
  * removed element held.
  */

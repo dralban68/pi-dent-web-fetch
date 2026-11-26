@@ -1,4 +1,4 @@
-/** Hiding methods shared by the page and the Markdown-body tests (specs/web-fetch.md, Section 10). */
+/** Hiding methods shared by the page and the Markdown-body tests (specs/web-fetch.md#tests). */
 
 export const VOID = new Set([
   "frame",

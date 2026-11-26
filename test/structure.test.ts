@@ -1,4 +1,4 @@
-/** specs/web-fetch.md, Sections 5.3 and 5.6: empty sections and table cells with block content. */
+/** specs/web-fetch.md#conversion, specs/web-fetch.md#empty-sections: empty sections and table cells with block content. */
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";

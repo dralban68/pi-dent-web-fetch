@@ -1,6 +1,6 @@
 /**
- * Content to Markdown (specs/web-fetch.md, Section 5): the HTML pipeline of Section 5.2, the
- * conversion of Section 5.3 and the title of Section 5.4.
+ * Content to Markdown (specs/web-fetch.md#content): the HTML pipeline of specs/web-fetch.md#html-pipeline, the
+ * conversion of specs/web-fetch.md#conversion and the title of specs/web-fetch.md#title.
  */
 
 import { Readability } from "@mozilla/readability";
@@ -13,7 +13,7 @@ import { sanitizeMarkdownHtml } from "./markdown-body.ts";
 import { sanitizeDocument } from "./sanitize.ts";
 import { cleanLine, cleanText } from "./text.ts";
 
-/** Below this many characters of article text, the body fallback is used (Section 5.2, step 5). */
+/** Below this many characters of article text, the body fallback is used (specs/web-fetch.md#html-pipeline, step 5). */
 export const MIN_ARTICLE_CHARS = 200;
 
 export const NOTICE_FALLBACK =
@@ -32,7 +32,7 @@ function parse(html: string): Document {
 
 const CELL_DELIMITER = /^(?=.*\|)(?=.*-)[ |:-]*$/;
 
-/** A cell's content on one line: its lines joined with ` · ` (Section 5.3). */
+/** A cell's content on one line: its lines joined with ` · ` (specs/web-fetch.md#conversion). */
 export function cellText(content: string): string {
   return content
     .split("\n")
@@ -42,7 +42,7 @@ export function cellText(content: string): string {
     .replace(/(?<!\\)\|/g, "\\|");
 }
 
-/** Placeholders of a Markdown body (Section 5.5): each element `<prefix><n>` gives back `texts[n]`. */
+/** Placeholders of a Markdown body (specs/web-fetch.md#markdown-bodies): each element `<prefix><n>` gives back `texts[n]`. */
 interface Placeholders {
   readonly prefix: string;
   readonly texts: readonly string[];
@@ -88,7 +88,7 @@ function createConverter(placeholders?: Placeholders): TurndownService {
 
 const converter = createConverter();
 
-/** Moves each `caption` before its table as a `p` (Section 5.3). */
+/** Moves each `caption` before its table as a `p` (specs/web-fetch.md#conversion). */
 function moveCaptions(root: HTMLElement): void {
   for (const caption of Array.from(root.querySelectorAll("caption"))) {
     const table = caption.closest("table");
@@ -100,7 +100,7 @@ function moveCaptions(root: HTMLElement): void {
 }
 
 /**
- * Converts a sanitized element to Markdown (Section 5.3). Turndown gets the serialised HTML and
+ * Converts a sanitized element to Markdown (specs/web-fetch.md#conversion). Turndown gets the serialised HTML and
  * parses it with its own DOM, which implements the table API (`rows`) that its tables plugin
  * needs and linkedom lacks.
  */
@@ -127,7 +127,7 @@ function baseUrl(document: Document, finalUrl: string): string {
     try {
       return new URL(base.getAttribute("href") ?? "", finalUrl).href;
     } catch {
-      // An unresolvable base falls back to the final URL (Section 5.2, step 2).
+      // An unresolvable base falls back to the final URL (specs/web-fetch.md#html-pipeline, step 2).
       return finalUrl;
     }
   }
@@ -142,7 +142,7 @@ function addHeading(markdown: string, title: string | null): string {
   return markdown === "" ? `${heading}\n` : `${heading}\n\n${markdown}`;
 }
 
-/** The HTML pipeline of Section 5.2. */
+/** The HTML pipeline of specs/web-fetch.md#html-pipeline. */
 export function extractHtml(html: string, finalUrl: string): Extracted {
   const notices: string[] = [];
   const document = parse(html);
@@ -172,7 +172,7 @@ export function extractHtml(html: string, finalUrl: string): Extracted {
 
 const HEADING = /^(#{1,6})(?: |$)/;
 
-/** Section 5.6: removes each heading whose section holds only empty and heading lines. */
+/** specs/web-fetch.md#empty-sections: removes each heading whose section holds only empty and heading lines. */
 export function dropEmptySections(markdown: string): string {
   const lines = markdown.split("\n");
   const levels: (number | undefined)[] = [];
@@ -225,7 +225,7 @@ function markdownTitle(markdown: string): string | null {
   return text === "" ? null : text;
 }
 
-/** Section 5.5: a Markdown or plain-text body with its embedded HTML sanitized and converted. */
+/** specs/web-fetch.md#markdown-bodies: a Markdown or plain-text body with its embedded HTML sanitized and converted. */
 function markdownBody(text: string, finalUrl: string): string {
   const sanitized = sanitizeMarkdownHtml(text, finalUrl);
   if (sanitized === undefined) return text;
@@ -234,7 +234,7 @@ function markdownBody(text: string, finalUrl: string): string {
   return cleanText(dropEmptySections(toMarkdown(root, service)));
 }
 
-/** Content of any supported kind to the text of `extracted.md` (Sections 5.5 and 5.7). */
+/** Content of any supported kind to the text of `extracted.md` (specs/web-fetch.md#markdown-bodies, specs/web-fetch.md#data-text). */
 export function extract(kind: ContentKind, text: string, finalUrl: string): Extracted {
   if (kind === "html") return extractHtml(text, finalUrl);
   if (kind === "data") {
@@ -242,7 +242,7 @@ export function extract(kind: ContentKind, text: string, finalUrl: string): Extr
     return { markdown: cleanText(text), title: null, notices: [] };
   }
   if (kind === "pdf" || kind === "binary") {
-    // A stored file's text comes from Section 5.9 (PDF) or is empty (5.8); the caller fills it in.
+    // A stored file's text comes from specs/web-fetch.md#pdf (PDF) or is empty (5.8); the caller fills it in.
     return { markdown: "", title: null, notices: [] };
   }
   const markdown = markdownBody(cleanText(text), finalUrl);

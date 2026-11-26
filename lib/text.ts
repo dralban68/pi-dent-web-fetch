@@ -1,4 +1,4 @@
-/** Text cleaning (specs/web-fetch.md, Section 6.4). */
+/** Text cleaning (specs/web-fetch.md#text-cleaning). */
 
 /** Cc except tab and line feed, all of Cf, and the variation selectors. */
 const INVISIBLE = /(?![\t\n])[\p{Cc}\p{Cf}\u{FE00}-\u{FE0F}\u{E0100}-\u{E01EF}]/gu;

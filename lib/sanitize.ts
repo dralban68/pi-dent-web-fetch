@@ -1,12 +1,12 @@
 /**
- * The sanitizer (specs/web-fetch.md, Section 6): removes what a reader of the rendered page would
+ * The sanitizer (specs/web-fetch.md#sanitizer): removes what a reader of the rendered page would
  * not see. Deterministic: its only inputs are the DOM and the fixed lists below.
  */
 
 import { styleHides } from "./style.ts";
 import { cleanText, collapseSpace } from "./text.ts";
 
-/** Section 6.1. */
+/** specs/web-fetch.md#removed-elements. */
 export const REMOVED_ELEMENTS: readonly string[] = [
   "script",
   "style",
@@ -48,7 +48,7 @@ export const REMOVED_ELEMENTS: readonly string[] = [
   "annotation-xml",
 ];
 
-/** Section 6.2.2. */
+/** specs/web-fetch.md#hidden-tokens. */
 export const HIDDEN_TOKENS: readonly string[] = [
   "a11y-hidden",
   "assistive-text",
@@ -93,7 +93,7 @@ function attribute(element: Element, attr: string): string | null {
   return element.getAttribute(attr);
 }
 
-/** Whether an element is removed by Section 6.1 or 6.2. */
+/** Whether an element is removed by specs/web-fetch.md#removed-elements or 6.2. */
 function isRemoved(element: Element): boolean {
   const tag = name(element);
   if (REMOVED.has(tag)) return true;
@@ -119,7 +119,7 @@ function resolved(value: string, base: string): URL | undefined {
   try {
     return new URL(value.trim(), base);
   } catch {
-    // An unresolvable URL is handled as a refused scheme by the caller (Section 6.3).
+    // An unresolvable URL is handled as a refused scheme by the caller (specs/web-fetch.md#attributes-and-urls).
     return undefined;
   }
 }
@@ -132,7 +132,7 @@ function unwrap(element: Element): void {
   element.remove();
 }
 
-/** Section 6.3: keeps `href` on `a`, `src` and `alt` on `img`, `open` on `dialog`; unwraps a refused link. */
+/** specs/web-fetch.md#attributes-and-urls: keeps `href` on `a`, `src` and `alt` on `img`, `open` on `dialog`; unwraps a refused link. */
 function cleanAttributes(element: Element, base: string): void {
   const tag = name(element);
   const keep = new Map<string, string>();
@@ -188,7 +188,7 @@ function sanitizeNode(node: Node, base: string, inPre: boolean): void {
 }
 
 /**
- * Sanitizes a document in place (Section 6): drops `head` and every non-element, non-text node,
+ * Sanitizes a document in place (specs/web-fetch.md#sanitizer): drops `head` and every non-element, non-text node,
  * removes hidden and removed elements, cleans attributes and text. `base` resolves URLs.
  */
 export function sanitizeDocument(document: Document, base: string): void {

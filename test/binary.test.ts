@@ -1,4 +1,4 @@
-/** Stored files and data text (specs/web-fetch.md, Sections 3.6, 4.2, 5.7 and 5.8). */
+/** Stored files and data text (specs/web-fetch.md#timeout-and-cap, specs/web-fetch.md#entry-layout, specs/web-fetch.md#data-text, specs/web-fetch.md#stored-files). */
 
 import assert from "node:assert/strict";
 import { readFile, readdir, writeFile } from "node:fs/promises";

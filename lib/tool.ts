@@ -1,6 +1,6 @@
 /**
- * The `WebFetch` tool (specs/web-fetch.md): registration (Section 2), the call's flow over the
- * cache (Section 4), the reformat (Section 7) and the result (Section 9).
+ * The `WebFetch` tool (specs/web-fetch.md): registration (specs/web-fetch.md#tool), the call's flow over the
+ * cache (specs/web-fetch.md#cache), the reformat (specs/web-fetch.md#reformat) and the result (specs/web-fetch.md#result).
  */
 
 import { readFileSync } from "node:fs";
@@ -98,11 +98,11 @@ export interface WebFetchDetails {
   readonly notices: readonly string[];
 }
 
-/** The test seam of Section 2.2. */
+/** The test seam of specs/web-fetch.md#test-seam. */
 export interface WebFetchOptions {
   readonly resolve?: Resolver;
   readonly allowedAddresses?: readonly string[];
-  /** Section 4.1: the environment, read at each call; the home and temporary folders. */
+  /** specs/web-fetch.md#cache-location: the environment, read at each call; the home and temporary folders. */
   readonly env?: Environment;
   readonly homeDir?: string;
   readonly tmpDir?: string;
@@ -112,7 +112,7 @@ export interface CallContext {
   readonly cwd: string;
   readonly modelRegistry: Registry;
   readonly sessionManager?: { getSessionId(): string };
-  /** Reports a warning of Section 4.1 to the UI, when there is one. */
+  /** Reports a warning of specs/web-fetch.md#cache-location to the UI, when there is one. */
   readonly warn?: (message: string) => void;
 }
 
@@ -139,7 +139,7 @@ function userAgent(): string {
 
 const USER_AGENT = userAgent();
 
-/** Section 9.1: the preview, not splitting a surrogate pair. */
+/** specs/web-fetch.md#result-text: the preview, not splitting a surrogate pair. */
 function preview(content: string): string {
   if (content.length <= PREVIEW_CHARS) return content;
   const code = content.charCodeAt(PREVIEW_CHARS - 1);
@@ -147,7 +147,7 @@ function preview(content: string): string {
   return content.slice(0, end);
 }
 
-/** Section 9.1: the `Reformat:` state. */
+/** specs/web-fetch.md#result-text: the `Reformat:` state. */
 export function reformatState(meta: ReformatMeta | null): string {
   if (meta === null) return "none";
   const head = `${meta.model}: ${meta.reformatted} of ${meta.chunks} chunks reformatted`;
@@ -225,7 +225,7 @@ async function fetchAndStore(
   }
   const kind = contentKind(response.contentType, response.finalUrl);
   if (kind === "pdf" || kind === "binary") {
-    // Sections 5.8 and 5.9: the body is stored unchanged; a PDF's text is extracted.
+    // specs/web-fetch.md#stored-files, specs/web-fetch.md#pdf: the body is stored unchanged; a PDF's text is extracted.
     const fileName = `file.${fileExtension(response.contentType, response.finalUrl)}`;
     let markdown = "";
     if (kind === "pdf") {
@@ -301,7 +301,7 @@ async function fetchAndStore(
   };
 }
 
-/** Section 7.1 and 7.2: the reformat of the served entry, or a skip notice. */
+/** specs/web-fetch.md#reformat-model, specs/web-fetch.md#reuse: the reformat of the served entry, or a skip notice. */
 async function applyReformat(
   served: Entry,
   config: WebConfig,
@@ -349,7 +349,7 @@ async function applyReformat(
   return { meta: next, extracted: served.extracted, content: result.content };
 }
 
-/** One call of the tool (Sections 3 to 9). */
+/** One call of the tool (specs/web-fetch.md#request, specs/web-fetch.md#cache, specs/web-fetch.md#content, specs/web-fetch.md#sanitizer, specs/web-fetch.md#reformat, specs/web-fetch.md#configuration, specs/web-fetch.md#result). */
 export async function runWebFetch(
   params: WebFetchParams,
   ctx: CallContext,
@@ -451,12 +451,12 @@ function isDetails(value: unknown): value is WebFetchDetails {
   return isRecord(value) && typeof value.status === "string" && typeof value.path === "string";
 }
 
-/** Builds the tool (Section 2.2); `config` returns the configuration read per Section 8. */
+/** Builds the tool (specs/web-fetch.md#test-seam); `config` returns the configuration read per specs/web-fetch.md#configuration. */
 export function createWebFetchTool(
   config: () => WebConfig,
   options: WebFetchOptions = {},
 ): ToolDefinition<typeof WebFetchSchema, WebFetchDetails> {
-  // Section 4.1: each distinct warning is reported once per extension instance.
+  // specs/web-fetch.md#cache-location: each distinct warning is reported once per extension instance.
   const warned = new Set<string>();
   return {
     name: "WebFetch",

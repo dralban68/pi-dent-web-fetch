@@ -1,8 +1,8 @@
-/** URL validation and the canonical URL (specs/web-fetch.md, Sections 3.1 and 3.2). */
+/** URL validation and the canonical URL (specs/web-fetch.md#url-validation, specs/web-fetch.md#canonical-url). */
 
 import { WebFetchError } from "./errors.ts";
 
-/** The parsed `url` parameter, or an input error (Section 3.1). */
+/** The parsed `url` parameter, or an input error (specs/web-fetch.md#url-validation). */
 export function validateUrl(raw: string): URL {
   let url: URL;
   try {
@@ -32,7 +32,7 @@ function compareUnits(a: string, b: string): number {
   return a > b ? 1 : 0;
 }
 
-/** The canonical URL of Section 3.2. */
+/** The canonical URL of specs/web-fetch.md#canonical-url. */
 export function canonicalUrl(url: URL): string {
   const out = new URL(url.href);
   out.hash = "";

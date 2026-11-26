@@ -1,6 +1,8 @@
 /**
- * The request: address guard, redirects, timeout, cancellation and size cap (specs/web-fetch.md,
- * Sections 3.3 to 3.7). Uses `node:http` and `node:https` so that each connection goes to the
+ * The request: address guard, redirects, timeout, cancellation and size cap
+ * (specs/web-fetch.md#request-headers, specs/web-fetch.md#address-guard,
+ * specs/web-fetch.md#redirects, specs/web-fetch.md#timeout-and-cap, specs/web-fetch.md#responses).
+ * Uses `node:http` and `node:https` so that each connection goes to the
  * address the guard checked.
  */
 
@@ -17,13 +19,13 @@ import { WebFetchError, errorMessage } from "./errors.ts";
 
 export const MAX_REDIRECTS = 5;
 export const TIMEOUT_MS = 30_000;
-/** The cap of Section 3.6 for the text kinds of Section 5.1. */
+/** The cap of specs/web-fetch.md#timeout-and-cap for the text kinds of specs/web-fetch.md#content-types. */
 export const MAX_BODY_BYTES = 10 * 1024 * 1024;
-/** The cap of Section 3.6 for stored files, PDFs included (5.8). */
+/** The cap of specs/web-fetch.md#timeout-and-cap for stored files, PDFs included (5.8). */
 export const MAX_STORED_BYTES = 50 * 1024 * 1024;
 export const ACCEPT = "text/markdown, text/html;q=0.9, text/plain;q=0.8, application/pdf;q=0.7";
 
-/** Every address of a host name (the test seam of Section 2.2). */
+/** Every address of a host name (the test seam of specs/web-fetch.md#test-seam). */
 export type Resolver = (hostname: string) => Promise<string[]>;
 
 export const systemResolver: Resolver = async (hostname) =>
@@ -63,7 +65,7 @@ function header(headers: IncomingHttpHeaders, name: string): string | null {
   return value ?? null;
 }
 
-/** The checked address to connect to, or the guard's refusal (Section 3.4). */
+/** The checked address to connect to, or the guard's refusal (specs/web-fetch.md#address-guard). */
 async function guardedAddress(url: URL, request: FetchRequest): Promise<string> {
   const host = url.hostname.replace(/^\[|\]$/g, "");
   if (isIP(host) === 0 && isLocalhostName(host)) {
@@ -156,7 +158,7 @@ async function readBody(response: IncomingMessage, maxBytes: number, finalUrl: s
   return Buffer.concat(chunks);
 }
 
-/** Fetches `request.url` per Sections 3.3 to 3.7. */
+/** Fetches `request.url` per specs/web-fetch.md#request-headers, specs/web-fetch.md#address-guard, specs/web-fetch.md#redirects, specs/web-fetch.md#timeout-and-cap, specs/web-fetch.md#responses. */
 export async function fetchPage(request: FetchRequest): Promise<FetchResponse> {
   const timeoutMs = request.timeoutMs ?? TIMEOUT_MS;
   const deadline = AbortSignal.timeout(timeoutMs);

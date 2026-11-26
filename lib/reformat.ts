@@ -1,5 +1,5 @@
 /**
- * The reformat (specs/web-fetch.md, Sections 7.2 to 7.6): chunks, one tool-free completion per
+ * The reformat (specs/web-fetch.md#reuse, specs/web-fetch.md#chunks, specs/web-fetch.md#completion, specs/web-fetch.md#exact-content-check, specs/web-fetch.md#kept-chunks): chunks, one tool-free completion per
  * chunk, and the exact-content check that decides whether its output replaces the chunk.
  */
 
@@ -26,7 +26,7 @@ export type RegistryModel = ReturnType<Registry["getAll"]>[number];
 
 const FENCE_OPEN = /^ {0,3}(`{3,}(?=[^`]*$)|~{3,})/;
 
-/** Section 7.3: blocks separated by blank lines; a fenced code block never spans two. */
+/** specs/web-fetch.md#chunks: blocks separated by blank lines; a fenced code block never spans two. */
 export function blocks(markdown: string): string[] {
   const out: string[] = [];
   let current: string[] = [];
@@ -58,7 +58,7 @@ export function chunkBudget(maxTokens: number): number {
   return Math.min(2 * maxTokens, MAX_CHUNK_CHARS);
 }
 
-/** Section 7.3: blocks packed greedily into chunks within the budget. */
+/** specs/web-fetch.md#chunks: blocks packed greedily into chunks within the budget. */
 export function chunks(markdown: string, budget: number): Chunk[] {
   const out: Chunk[] = [];
   let current = "";
@@ -96,7 +96,7 @@ function textOf(content: unknown): string {
   return parts.join("");
 }
 
-/** Section 7.4: the output processed before the check. */
+/** specs/web-fetch.md#completion: the output processed before the check. */
 export function processOutput(output: string): string {
   const lines = cleanText(output).split("\n");
   const first = lines.findIndex((line) => line.trim() !== "");
@@ -169,7 +169,7 @@ async function complete(
     if (signal?.aborted === true) throw new WebFetchError("cancelled", "WebFetch: cancelled");
     if (timedOut) return { reason: "timed out" };
     if (error instanceof WebFetchError) throw error;
-    // Counted as a kept chunk and reported in the result's Reformat line (Section 9.1).
+    // Counted as a kept chunk and reported in the result's Reformat line (specs/web-fetch.md#result-text).
     return { reason: "model error" };
   } finally {
     clearTimeout(timer);
@@ -184,7 +184,7 @@ export interface ReformatInput {
   readonly modelString: string;
   readonly extracted: string;
   readonly extractedSha256: string;
-  /** The entry's current reformat and `content.md`, for a partial retry (Section 7.2). */
+  /** The entry's current reformat and `content.md`, for a partial retry (specs/web-fetch.md#reuse). */
   readonly previous?: { readonly meta: ReformatMeta; readonly content: string } | undefined;
   readonly signal?: AbortSignal | undefined;
   readonly timeoutMs?: number;
@@ -203,7 +203,7 @@ function previousTexts(content: string, parts: readonly ReformatPart[]): string[
   return offset === content.replace(/\n$/, "").length ? texts : undefined;
 }
 
-/** Sections 7.2 to 7.6: the new `content.md` and the entry's `reformat`. */
+/** specs/web-fetch.md#reuse, specs/web-fetch.md#chunks, specs/web-fetch.md#completion, specs/web-fetch.md#exact-content-check, specs/web-fetch.md#kept-chunks: the new `content.md` and the entry's `reformat`. */
 export async function reformat(
   input: ReformatInput,
 ): Promise<{ content: string; meta: ReformatMeta }> {
@@ -264,7 +264,7 @@ export async function reformat(
   };
 }
 
-/** Whether a stored reformat is reused with no completion (Section 7.2). */
+/** Whether a stored reformat is reused with no completion (specs/web-fetch.md#reuse). */
 export function isReusable(meta: ReformatMeta | null, modelString: string, sha: string): boolean {
   return (
     meta !== null &&

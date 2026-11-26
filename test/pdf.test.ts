@@ -1,4 +1,4 @@
-/** PDF text extraction (specs/web-fetch.md, Sections 5.8 and 5.9). */
+/** PDF text extraction (specs/web-fetch.md#stored-files, specs/web-fetch.md#pdf). */
 
 import assert from "node:assert/strict";
 import { readFile, readdir } from "node:fs/promises";

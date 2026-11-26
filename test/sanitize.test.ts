@@ -1,5 +1,5 @@
 /**
- * specs/web-fetch.md, Sections 6 and 10: each sanitizer rule is shown with a page that hides
+ * specs/web-fetch.md#sanitizer, specs/web-fetch.md#tests: each sanitizer rule is shown with a page that hides
  * `INJECTION-<rule>` that way; the string must be absent from extracted.md, content.md and the
  * result, while the visible text around it stays.
  */

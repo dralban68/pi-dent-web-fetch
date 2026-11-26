@@ -1,4 +1,4 @@
-/** Inline styles that hide an element (specs/web-fetch.md, Section 6.2.1). */
+/** Inline styles that hide an element (specs/web-fetch.md#inline-style). */
 
 interface CssNumber {
   readonly value: number;
@@ -114,7 +114,7 @@ const SIZE_PROPERTIES = ["width", "height", "max-width", "max-height"];
 const OFFSET_PROPERTIES = ["left", "top", "right", "bottom", "margin-left", "margin-top"];
 const OVERFLOW_PROPERTIES = ["overflow", "overflow-x", "overflow-y"];
 
-/** Whether a `style` value hides its element per the table of Section 6.2.1. */
+/** Whether a `style` value hides its element per the table of specs/web-fetch.md#inline-style. */
 export function styleHides(style: string): boolean {
   const d = parseStyle(style);
   const get = (property: string): string => d.get(property) ?? "";

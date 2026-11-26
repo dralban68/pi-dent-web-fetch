@@ -1,6 +1,6 @@
 /**
- * The tool's errors. `kind` decides whether a stale copy may stand in (specs/web-fetch.md,
- * Section 4.5): only a `fetch` failure is served stale; `input` and `cancelled` never are.
+ * The tool's errors. `kind` decides whether a stale copy may stand in
+ * (specs/web-fetch.md#stale-copy): only a `fetch` failure is served stale; `input` and `cancelled` never are.
  */
 
 export type ErrorKind = "input" | "fetch" | "cancelled";

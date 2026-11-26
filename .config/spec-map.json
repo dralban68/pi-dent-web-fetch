@@ -1,0 +1,6 @@
+{
+  "externalSpecs": {
+    "config-file.md": "pi-dent-agent's specs/config-file.md",
+    "model-string.md": "pi-dent-agent's specs/model-string.md"
+  }
+}

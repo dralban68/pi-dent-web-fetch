@@ -1,4 +1,4 @@
-/** Content types and character decoding (specs/web-fetch.md, Sections 3.8 and 5.1). */
+/** Content types and character decoding (specs/web-fetch.md#character-decoding, specs/web-fetch.md#content-types). */
 
 import { WebFetchError } from "./errors.ts";
 
@@ -11,7 +11,7 @@ export function mediaType(contentType: string | null): string | null {
   return type === "" ? null : type;
 }
 
-/** The data text media types of Section 5.7. */
+/** The data text media types of specs/web-fetch.md#data-text. */
 const DATA_TYPES = new Set([
   "application/json",
   "text/csv",
@@ -21,7 +21,7 @@ const DATA_TYPES = new Set([
   "application/atom+xml",
 ]);
 
-/** The stored-file extensions of Section 5.8, per media type. */
+/** The stored-file extensions of specs/web-fetch.md#stored-files, per media type. */
 const FILE_EXTENSIONS = new Map<string, string>([
   ["application/pdf", "pdf"],
   ["image/png", "png"],
@@ -48,7 +48,7 @@ const FILE_EXTENSIONS = new Map<string, string>([
   ["application/wasm", "wasm"],
 ]);
 
-/** Whether the media type is one of the text kinds of Section 5.1 (HTML, Markdown, plain, data). */
+/** Whether the media type is one of the text kinds of specs/web-fetch.md#content-types (HTML, Markdown, plain, data). */
 export function isTextMediaType(type: string): boolean {
   return (
     type === "text/html" ||
@@ -64,7 +64,7 @@ function isDataMediaType(type: string): boolean {
   return DATA_TYPES.has(type) || type.endsWith("+json");
 }
 
-/** The handling of a content type, or the refusal of Section 5.1. */
+/** The handling of a content type, or the refusal of specs/web-fetch.md#content-types. */
 export function contentKind(contentType: string | null, finalUrl: string): ContentKind {
   const type = mediaType(contentType);
   if (type === null) {
@@ -79,7 +79,7 @@ export function contentKind(contentType: string | null, finalUrl: string): Conte
 }
 
 /**
- * The stored file's extension of Section 5.8: the map's value for the media type, else the final
+ * The stored file's extension of specs/web-fetch.md#stored-files: the map's value for the media type, else the final
  * URL's path extension (1 to 8 ASCII letters or digits), else `bin`.
  */
 export function fileExtension(contentType: string | null, finalUrl: string): string {
@@ -108,7 +108,7 @@ function metaCharset(body: Buffer): string | undefined {
   return equiv?.[1];
 }
 
-/** The decoded body, with the notice of Section 3.8 when the label is unknown. */
+/** The decoded body, with the notice of specs/web-fetch.md#character-decoding when the label is unknown. */
 export function decodeBody(
   body: Buffer,
   contentType: string | null,

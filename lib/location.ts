@@ -1,4 +1,4 @@
-/** The cache location (specs/web-fetch.md, Section 4.1): its sources, values and refusals. */
+/** The cache location (specs/web-fetch.md#cache-location): its sources, values and refusals. */
 
 import { isAbsolute, join, parse, relative, resolve, sep } from "node:path";
 
@@ -79,7 +79,7 @@ function meaning(value: string, input: LocationInput): Meaning | { readonly prob
   return { dir, owned: false };
 }
 
-/** Section 4.1: the first source that gives a usable value, in the order of precedence. */
+/** specs/web-fetch.md#cache-location: the first source that gives a usable value, in the order of precedence. */
 export function chooseLocation(input: LocationInput): ChosenLocation {
   const notices: string[] = [];
   const warnings: string[] = [];
@@ -115,7 +115,7 @@ export function chooseLocation(input: LocationInput): ChosenLocation {
   return done({ dir: join(input.cwd, CACHE_DIR), owned: true });
 }
 
-/** Section 4.1: the path relative to cwd with `/` separators when under cwd, else `undefined`. */
+/** specs/web-fetch.md#cache-location: the path relative to cwd with `/` separators when under cwd, else `undefined`. */
 export function relativeUnder(cwd: string, path: string): string | undefined {
   const rel = relative(cwd, path);
   if (rel === "" || isAbsolute(rel) || rel === ".." || rel.startsWith(`..${sep}`)) return undefined;

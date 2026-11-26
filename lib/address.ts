@@ -1,4 +1,4 @@
-/** The blocked address ranges of the address guard (specs/web-fetch.md, Section 3.4). */
+/** The blocked address ranges of the address guard (specs/web-fetch.md#address-guard). */
 
 import { isIP } from "node:net";
 

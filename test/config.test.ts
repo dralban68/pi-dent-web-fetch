@@ -1,4 +1,4 @@
-/** specs/web-fetch.md, Sections 7.1 and 8: configuration, model strings, and the wiring. */
+/** specs/web-fetch.md#reformat-model, specs/web-fetch.md#configuration: configuration, model strings, and the wiring. */
 
 import assert from "node:assert/strict";
 import { join } from "node:path";

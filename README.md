@@ -34,7 +34,7 @@ cannot steer the agent into the local network.
 - **Limits:** 30 s to fetch, PDF extraction included; 10 MiB for text bodies, 50 MiB for stored
   files; 100 PDF pages.
 
-The exact rules, every limit and the result format are in `specs/web-fetch.md`.
+The exact rules, every limit and the result format are in [web-fetch.md](specs/web-fetch.md).
 
 ## Using it
 
@@ -44,9 +44,9 @@ pi-dent bundles it. Standalone:
 pi install npm:pi-dent-web-fetch
 ```
 
-Settings go under `web` in pi-dent's `pi-dent.conf` (`specs/web-fetch.md`, Configuration); the
+Settings go under `web` in pi-dent's `pi-dent.conf` ([web-fetch.md, configuration](specs/web-fetch.md#configuration)); the
 cache location also comes from the `cache` parameter or `PI_DENT_WEB_CACHE_DIR`
-(`specs/web-fetch.md`, Location):
+([web-fetch.md, cache location](specs/web-fetch.md#cache-location)):
 
 ```jsonc
 { "web": { "cache": "project", "reformat": true, "reformatModel": "fast" } }
@@ -59,7 +59,7 @@ Requires Node 26 or later.
 
 ## Documentation
 
-- `specs/web-fetch.md`: the `WebFetch` tool, every rule and limit.
+- [web-fetch.md](specs/web-fetch.md): the `WebFetch` tool, every rule and limit.
 - `AGENTS.md`: how to work on the repository.
 
 ## License

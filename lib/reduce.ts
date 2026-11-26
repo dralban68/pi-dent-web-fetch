@@ -1,4 +1,4 @@
-/** The exact-content check of the reformat (specs/web-fetch.md, Section 7.5). */
+/** The exact-content check of the reformat (specs/web-fetch.md#exact-content-check). */
 
 export interface Reduction {
   /** Fence contents, in order, exact. */
@@ -65,7 +65,7 @@ function unbracket(dest: string): string {
   return dest.startsWith("<") && dest.endsWith(">") ? dest.slice(1, -1) : dest;
 }
 
-/** The reduction of a Markdown text (Section 7.5, steps 1 to 7). */
+/** The reduction of a Markdown text (specs/web-fetch.md#exact-content-check, steps 1 to 7). */
 export function reduce(markdown: string): Reduction {
   const { lines, code } = fences(markdown.split("\n"));
   const kept = lines
@@ -159,7 +159,7 @@ export interface CodeCheck {
 }
 
 /**
- * The code check of Section 7.5: existing fences kept exactly, new fences copy input lines; and
+ * The code check of specs/web-fetch.md#exact-content-check: existing fences kept exactly, new fences copy input lines; and
  * the label lines folded into an output fence's one-word info string.
  */
 export function codeCheck(input: string, output: string): CodeCheck {
@@ -200,7 +200,7 @@ export function codeCheck(input: string, output: string): CodeCheck {
 
 export type CheckResult = "pass" | "code changed" | "links changed" | "text changed";
 
-/** The exact-content check of a chunk and its processed output (Section 7.5). */
+/** The exact-content check of a chunk and its processed output (specs/web-fetch.md#exact-content-check). */
 export function checkChunk(input: string, output: string): CheckResult {
   const code = codeCheck(input, output);
   if (!code.ok) return "code changed";

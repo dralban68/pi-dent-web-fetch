@@ -1,7 +1,7 @@
 /**
- * The configuration of pi-dent-web-fetch (specs/web-fetch.md, Section 8): the root key `web` of
+ * The configuration of pi-dent-web-fetch (specs/web-fetch.md#configuration): the root key `web` of
  * pi-dent's layered `pi-dent.conf`, read as pi-dent-agent `specs/config-file.md`, Sections 1, 2,
- * 3 and 7 specify, plus the merged `modelClasses` value for Section 7.1. A layer whose read or
+ * 3 and 7 specify, plus the merged `modelClasses` value for specs/web-fetch.md#reformat-model. A layer whose read or
  * parse fails is dropped without a diagnostic from this extension: pi-dent reports it.
  */
 
@@ -23,7 +23,7 @@ export interface ConfigLayer {
 export interface WebConfig {
   readonly reformat?: boolean;
   readonly reformatModel?: string;
-  /** `web.cache`, trimmed, with the file of the layer that set it (Section 4.1). */
+  /** `web.cache`, trimmed, with the file of the layer that set it (specs/web-fetch.md#cache-location). */
   readonly cache?: { readonly value: string; readonly file: string };
   readonly modelClasses?: Readonly<Record<string, unknown>>;
   /** Each is reported as `pi-dent-web-fetch: <message>`. */
@@ -214,7 +214,7 @@ export function resolveConfig(layers: {
   return { ...reformat, ...model, ...cache, ...modelClasses, diagnostics };
 }
 
-/** Both layers read, parsed and resolved; called once per extension instance (Section 8). */
+/** Both layers read, parsed and resolved; called once per extension instance (specs/web-fetch.md#configuration). */
 export function loadWebConfig(dependencies: ConfigDependencies): WebConfig {
   const homeDir = dependencies.homeDir ?? homedir();
   const env = dependencies.env ?? process.env;
@@ -231,7 +231,7 @@ function readText(path: string): string | undefined {
   try {
     return readFileSync(path, "utf8");
   } catch {
-    // Section 8: a layer that cannot be read is dropped; pi-dent reports it.
+    // specs/web-fetch.md#configuration: a layer that cannot be read is dropped; pi-dent reports it.
     return undefined;
   }
 }

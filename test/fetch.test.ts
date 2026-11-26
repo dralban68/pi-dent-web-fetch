@@ -1,4 +1,4 @@
-/** specs/web-fetch.md, Sections 3 and 5.1: the request, its guard and limits, and content types. */
+/** specs/web-fetch.md#request, specs/web-fetch.md#content-types: the request, its guard and limits, and content types. */
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";

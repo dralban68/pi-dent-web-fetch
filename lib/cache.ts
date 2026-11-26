@@ -1,4 +1,4 @@
-/** The cache (specs/web-fetch.md, Sections 4.1 to 4.3): location, entry layout, writing. */
+/** The cache (specs/web-fetch.md#cache-location, specs/web-fetch.md#entry-layout, specs/web-fetch.md#writing): location, entry layout, writing. */
 
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
@@ -67,14 +67,14 @@ export interface EntryPaths {
   readonly content: string;
   readonly extracted: string;
   readonly meta: string;
-  /** `content.md` relative to cwd, with `/` separators, when it is under cwd (Section 4.1). */
+  /** `content.md` relative to cwd, with `/` separators, when it is under cwd (specs/web-fetch.md#cache-location). */
   readonly relativeContent: string | undefined;
-  /** The display paths of Section 4.1. */
+  /** The display paths of specs/web-fetch.md#cache-location. */
   readonly displayContent: string;
   readonly displayExtracted: string;
 }
 
-/** The path of a stored file inside the entry (Section 5.8). */
+/** The path of a stored file inside the entry (specs/web-fetch.md#stored-files). */
 export function filePath(dir: string, name: string): string {
   return join(dir, name);
 }
@@ -83,13 +83,13 @@ export function sha256(text: string): string {
   return createHash("sha256").update(text, "utf8").digest("hex");
 }
 
-/** `<host>` of Section 4.2. */
+/** `<host>` of specs/web-fetch.md#entry-layout. */
 export function hostDirectory(url: URL): string {
   const host = url.hostname.replace(/[[\]]/g, "").replace(/:/g, "_");
   return url.port === "" ? host : `${host}_${url.port}`;
 }
 
-/** `<slug>` of Section 4.2. */
+/** `<slug>` of specs/web-fetch.md#entry-layout. */
 export function slug(url: URL): string {
   const text = url.pathname
     .toLowerCase()
@@ -197,7 +197,7 @@ async function readOptional(path: string): Promise<string | undefined> {
 
 /**
  * The entry, `"absent"` when its directory holds none of its files, or `"unreadable"` when some
- * file is missing or `meta.json` is not valid (Section 4.2). A stored file (5.8) counts: an entry
+ * file is missing or `meta.json` is not valid (specs/web-fetch.md#entry-layout). A stored file (5.8) counts: an entry
  * whose `meta.json` names one requires it to exist.
  */
 export async function readEntry(paths: EntryPaths): Promise<Entry | "absent" | "unreadable"> {
@@ -239,14 +239,14 @@ async function isFile(path: string): Promise<boolean> {
   }
 }
 
-/** Fills the fields an older entry may lack (Section 4.2). */
+/** Fills the fields an older entry may lack (specs/web-fetch.md#entry-layout). */
 function normalizeMeta(meta: Meta): Meta {
   return meta.fileName === undefined ? { ...meta, fileName: null, fileBytes: null } : meta;
 }
 
 /**
  * Creates the cache directory when absent, and its `.gitignore` when absent for an owned location,
- * or when this call created a folder-path location (Section 4.1).
+ * or when this call created a folder-path location (specs/web-fetch.md#cache-location).
  */
 export async function ensureCacheDirectory(location: CacheLocation): Promise<void> {
   const created = await mkdir(location.dir, { recursive: true });
@@ -260,7 +260,7 @@ export async function ensureCacheDirectory(location: CacheLocation): Promise<voi
 
 /**
  * Writes the given files of an entry in order, each through a temporary file and a rename,
- * skipping a file whose content is unchanged (Section 4.3). A `Buffer` is written as bytes, a
+ * skipping a file whose content is unchanged (specs/web-fetch.md#writing). A `Buffer` is written as bytes, a
  * string as UTF-8 text.
  */
 export async function writeEntry(

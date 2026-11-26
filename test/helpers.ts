@@ -120,7 +120,7 @@ export interface CallOptions {
   readonly resolve?: (host: string) => Promise<string[]>;
   readonly allowed?: readonly string[];
   readonly signal?: AbortSignal;
-  /** Section 2.2: the environment (default empty), home and temporary folders. */
+  /** specs/web-fetch.md#test-seam: the environment (default empty), home and temporary folders. */
   readonly env?: Record<string, string>;
   readonly homeDir?: string;
   readonly tmpDir?: string;

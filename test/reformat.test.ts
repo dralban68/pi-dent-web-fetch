@@ -1,4 +1,4 @@
-/** specs/web-fetch.md, Sections 7 and 10: the reformat, its exact-content check, reuse and retry. */
+/** specs/web-fetch.md#reformat, specs/web-fetch.md#tests: the reformat, its exact-content check, reuse and retry. */
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";

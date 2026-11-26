@@ -10,7 +10,7 @@ import { loadWebConfig, type WebConfig } from "./lib/config.ts";
 import { createWebFetchTool } from "./lib/tool.ts";
 
 export default function piDentWebFetch(pi: ExtensionAPI): void {
-  // Read once per extension instance, at its first session_start or first call (Section 8).
+  // Read once per extension instance, at its first session_start or first call (specs/web-fetch.md#configuration).
   let config: WebConfig | undefined;
   const load = (): WebConfig => {
     config ??= loadWebConfig({ cwd: process.cwd() });

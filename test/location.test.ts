@@ -1,4 +1,4 @@
-/** specs/web-fetch.md, Sections 4.1, 8 and 9.1: the cache location, its sources and the path lines. */
+/** specs/web-fetch.md#cache-location, specs/web-fetch.md#configuration, specs/web-fetch.md#result-text: the cache location, its sources and the path lines. */
 
 import assert from "node:assert/strict";
 import { mkdir, readFile, readdir, stat, writeFile } from "node:fs/promises";

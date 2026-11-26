@@ -1,5 +1,5 @@
 /**
- * PDF text extraction (specs/web-fetch.md, Section 5.9): a worker thread runs PDF.js (it ignores
+ * PDF text extraction (specs/web-fetch.md#pdf): a worker thread runs PDF.js (it ignores
  * cancellation, so the tool stops the worker at the call's time budget), and the page's
  * `getTextContent()` items are paired with the page's operator-list runs to drop text that a
  * reader cannot see: an invisible render mode, an effective font size below 1 pt, or a position
@@ -11,13 +11,13 @@ import { Worker } from "node:worker_threads";
 import { WebFetchError, errorMessage } from "./errors.ts";
 import { cleanText } from "./text.ts";
 
-/** Section 5.9: at most this many pages are extracted. */
+/** specs/web-fetch.md#pdf: at most this many pages are extracted. */
 export const PAGE_LIMIT = 100;
-/** Section 5.9: the pairing tolerance, in points. */
+/** specs/web-fetch.md#pdf: the pairing tolerance, in points. */
 export const PAIR_TOLERANCE_PT = 1;
-/** Section 5.9: an effective font size below this many points is dropped. */
+/** specs/web-fetch.md#pdf: an effective font size below this many points is dropped. */
 export const MIN_FONT_PT = 1;
-/** The call's whole budget of Section 3.6, which the extraction shares. */
+/** The call's whole budget of specs/web-fetch.md#timeout-and-cap, which the extraction shares. */
 export const EXTRACTION_BUDGET_MS = 30_000;
 
 export const NOTICE_PAGE_LIMIT = `PDF text extraction stopped at ${PAGE_LIMIT} pages.`;
@@ -112,7 +112,7 @@ function cloneState(state: GraphicsState): GraphicsState {
 
 /**
  * Tracks the graphics state over the page's operator runs, giving each show-text run its origin in
- * page space, its effective font size and its render mode (Section 5.9).
+ * page space, its effective font size and its render mode (specs/web-fetch.md#pdf).
  */
 export function trackRuns(rawRuns: readonly RawRun[]): TextRun[] {
   const runs: TextRun[] = [];
@@ -217,7 +217,7 @@ function matrix(a: readonly (number | readonly number[] | null)[], index = 0): M
   return [v[0] ?? 1, v[1] ?? 0, v[2] ?? 0, v[3] ?? 1, v[4] ?? 0, v[5] ?? 0];
 }
 
-/** Whether an item's origin pairs with a run's origin (Section 5.9). */
+/** Whether an item's origin pairs with a run's origin (specs/web-fetch.md#pdf). */
 function pairs(run: TextRun, item: RawItem): boolean {
   return (
     Math.abs(run.x - item.t[0]) <= PAIR_TOLERANCE_PT &&
@@ -234,7 +234,7 @@ export function runVisible(run: TextRun, view: readonly [number, number, number,
 }
 
 /**
- * One page's text (Section 5.9). Items and runs are in stream order. An item whose origin pairs with
+ * One page's text (specs/web-fetch.md#pdf). Items and runs are in stream order. An item whose origin pairs with
  * a later run starts from that run; an item that pairs with none continues the current run, since
  * PDF.js splits one run into several items. An item is kept when its run is visible. Runs passed
  * over between two paired items were merged by PDF.js into the earlier item, or dropped by it; the
@@ -297,7 +297,7 @@ export function pageText(
   return cleanText(text);
 }
 
-/** The Markdown of the extracted pages: one `## Page n` section per page with text (Section 5.9). */
+/** The Markdown of the extracted pages: one `## Page n` section per page with text (specs/web-fetch.md#pdf). */
 export function pagesToMarkdown(pages: readonly PdfPage[]): string {
   let markdown = "";
   for (const { page, text } of pages) {
@@ -366,7 +366,7 @@ interface WorkerMessage {
 }
 
 /**
- * Extracts the PDF's pages (Section 5.9). The worker stops at `timeoutMs`; on the abort signal the
+ * Extracts the PDF's pages (specs/web-fetch.md#pdf). The worker stops at `timeoutMs`; on the abort signal the
  * call ends with `WebFetch: cancelled`.
  */
 export async function extractPdf(

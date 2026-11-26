@@ -1,5 +1,5 @@
 /**
- * Resolution of the reformat model string (specs/web-fetch.md, Section 7.1), per pi-dent-agent
+ * Resolution of the reformat model string (specs/web-fetch.md#reformat-model), per pi-dent-agent
  * `specs/model-string.md`, Sections 1 to 4: concrete selectors, class references through
  * `modelClasses`, the `fallback` class and thinking precedence. Self-contained: pi-dent's
  * implementation is the reference, not a dependency.
@@ -67,7 +67,7 @@ type Parsed =
       readonly thinking: ThinkingLevel | undefined;
     };
 
-/** Sections 1 and 2: the grammar, the components and the thinking suffix. */
+/** model-string.md, Sections 1 and 2: the grammar, the components and the thinking suffix. */
 export function parseModelString(raw: string): Parsed {
   const text = raw.trim();
   if (text === "") throw invalid("model string must be non-empty");
@@ -98,7 +98,7 @@ export function parseModelString(raw: string): Parsed {
   return { kind: "concrete", provider, id, thinking };
 }
 
-/** Section 3: a `modelClasses` value as a concrete selector, or `invalid-plan`. */
+/** model-string.md, Section 3: a `modelClasses` value as a concrete selector, or `invalid-plan`. */
 function mapping(name: string, value: unknown): Concrete {
   if (typeof value === "string") {
     const parsed = parseModelString(value);
@@ -123,7 +123,7 @@ function mapping(name: string, value: unknown): Concrete {
   );
 }
 
-/** Section 4.4: the levels a model supports. */
+/** model-string.md, Section 4.4: the levels a model supports. */
 function supports(model: InventoryModel, level: ThinkingLevel): boolean {
   if (model.reasoning !== true) return level === "off";
   const mapped = model.thinkingLevelMap?.[level];
@@ -134,7 +134,7 @@ function supports(model: InventoryModel, level: ThinkingLevel): boolean {
 
 class NoMatch extends ModelStringError {}
 
-/** Section 4.1: the one inventory model of a selector, with its thinking checked. */
+/** model-string.md, Section 4.1: the one inventory model of a selector, with its thinking checked. */
 function match<TModel extends InventoryModel>(
   inventory: readonly TModel[],
   selector: Concrete,
@@ -167,7 +167,7 @@ function withThinking(selector: Concrete, explicit: ThinkingLevel | undefined): 
   return explicit === undefined ? selector : { ...selector, thinking: explicit };
 }
 
-/** Section 4: a model string to its inventory model and thinking level. */
+/** model-string.md, Section 4: a model string to its inventory model and thinking level. */
 export function resolveModelString<TModel extends InventoryModel>(
   raw: string,
   inventory: readonly TModel[],

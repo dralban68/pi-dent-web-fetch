@@ -1,5 +1,5 @@
 /**
- * PDF fixture builder for the tests (specs/web-fetch.md, Section 10): a committed helper that
+ * PDF fixture builder for the tests (specs/web-fetch.md#tests): a committed helper that
  * assembles minimal PDFs from content streams, so a fixture controls the text render mode, the
  * font size and the position exactly. No committed binary fixture files.
  */
