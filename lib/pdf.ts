@@ -42,14 +42,15 @@ export interface PdfExtraction {
 /** A show-text operator (showText, showSpacedText, nextLineShowText, nextLineSetSpacingShowText). */
 const SHOW_OPS = [44, 45, 46, 47];
 /** Operators whose arguments the run tracker consumes. */
-const RUN_OPS = [10, 11, 12, 31, 36, 37, 38, 39, 40, 41, 42, 74, 75];
+const RUN_OPS = [10, 11, 12, 31, 36, 37, 38, 39, 40, 41, 42, 43, 74, 75];
 
-/** One show-text run: its origin, its effective font size and its render mode. */
+/** One show-text run: its origin, its effective font size, its render mode and its text. */
 export interface TextRun {
   readonly x: number;
   readonly y: number;
   readonly size: number;
   readonly mode: number;
+  readonly text: string;
 }
 
 /** A compact operator run from the worker: `op` plus its arguments, each a number, an array of
@@ -57,7 +58,20 @@ export interface TextRun {
 export interface RawRun {
   readonly op: number;
   readonly a?: readonly (number | readonly number[] | null)[];
-  readonly g?: number;
+  /** A show-text run's text: the Unicode of its glyphs. */
+  readonly s?: string;
+}
+
+/** `Td tx ty`: the translation is in text space, so the text matrix's linear part scales it. */
+function translate(tm: Matrix, tx: number, ty: number): Matrix {
+  return [
+    tm[0],
+    tm[1],
+    tm[2],
+    tm[3],
+    tm[4] + tx * tm[0] + ty * tm[2],
+    tm[5] + tx * tm[1] + ty * tm[3],
+  ];
 }
 
 /** A compact text item from the worker: string, end-of-line flag, origin. */
@@ -135,11 +149,14 @@ export function trackRuns(rawRuns: readonly RawRun[]): TextRun[] {
         state.rise = num(a, 0) ?? 0;
         break;
       case 40: // moveText
-        tm = [tm[0], tm[1], tm[2], tm[3], tm[4] + (num(a, 0) ?? 0), tm[5] + (num(a, 1) ?? 0)];
+        tm = translate(tm, num(a, 0) ?? 0, num(a, 1) ?? 0);
         break;
       case 41: // setLeadingMoveText
         state.leading = -(num(a, 1) ?? 0);
-        tm = [tm[0], tm[1], tm[2], tm[3], tm[4] + (num(a, 0) ?? 0), tm[5] + (num(a, 1) ?? 0)];
+        tm = translate(tm, num(a, 0) ?? 0, num(a, 1) ?? 0);
+        break;
+      case 43: // nextLine: Td 0 -leading
+        tm = translate(tm, 0, -state.leading);
         break;
       case 42: // setTextMatrix
         tm = scalarsMatrix(a);
@@ -155,14 +172,16 @@ export function trackRuns(rawRuns: readonly RawRun[]): TextRun[] {
         if (SHOW_OPS.includes(raw.op)) {
           if (raw.op === 46 || raw.op === 47) {
             // nextLineShowText and nextLineSetSpacingShowText: Td 0 -leading, then show.
-            tm = [tm[0], tm[1], tm[2], tm[3], tm[4], tm[5] - state.leading];
+            tm = translate(tm, 0, -state.leading);
           }
+          const origin = translate(tm, 0, state.rise);
           runs.push({
-            x: state.ctm[4] + state.ctm[0] * tm[4] + state.ctm[2] * (tm[5] + state.rise),
-            y: state.ctm[5] + state.ctm[1] * tm[4] + state.ctm[3] * (tm[5] + state.rise),
+            x: state.ctm[4] + state.ctm[0] * origin[4] + state.ctm[2] * origin[5],
+            y: state.ctm[5] + state.ctm[1] * origin[4] + state.ctm[3] * origin[5],
             size:
               state.fontSize * Math.hypot(tm[2], tm[3]) * Math.hypot(state.ctm[2], state.ctm[3]),
             mode: state.mode,
+            text: raw.s ?? "",
           });
         }
     }
@@ -175,8 +194,12 @@ function num(a: readonly (number | readonly number[] | null)[], index: number): 
   return typeof value === "number" ? value : undefined;
 }
 
-/** A matrix given as six arguments (`transform`, `setTextMatrix`). */
+/**
+ * A matrix given as six arguments, or as one argument slot holding all six: PDF.js packs
+ * `setTextMatrix` (and may pack `transform`) into one array.
+ */
 function scalarsMatrix(a: readonly (number | readonly number[] | null)[]): Matrix {
+  if (Array.isArray(a[0])) return matrix(a, 0);
   return [
     num(a, 0) ?? 1,
     num(a, 1) ?? 0,
@@ -211,8 +234,11 @@ export function runVisible(run: TextRun, view: readonly [number, number, number,
 }
 
 /**
- * One page's text (Section 5.9): the items are paired with the runs at their origin; an item with
- * no run, or whose run is invisible, is dropped. The kept strings join with one space, an
+ * One page's text (Section 5.9). Items and runs are in stream order. An item whose origin pairs with
+ * a later run starts from that run; an item that pairs with none continues the current run, since
+ * PDF.js splits one run into several items. An item is kept when its run is visible. Runs passed
+ * over between two paired items were merged by PDF.js into the earlier item, or dropped by it; the
+ * text of each invisible one is removed from that item. The kept strings join with one space, an
  * end-of-line flag becoming one line feed; text cleaning (6.4) is applied.
  */
 export function pageText(
@@ -221,20 +247,52 @@ export function pageText(
   view: readonly [number, number, number, number],
 ): string {
   const runs = trackRuns(rawRuns);
-  let run = 0;
-  let text = "";
-  let eol = false;
+  const kept: { s: string; eol: boolean }[] = [];
+  let next = 0;
+  let current: TextRun | undefined;
+  let previousKept: { s: string; eol: boolean } | undefined;
+  const stripHidden = (from: number, to: number): void => {
+    if (previousKept === undefined) return;
+    for (let index = from; index < to; index += 1) {
+      const passed = runs[index];
+      if (passed === undefined || runVisible(passed, view) || passed.text.trim() === "") continue;
+      const at = previousKept.s.lastIndexOf(passed.text);
+      if (at !== -1) {
+        previousKept.s =
+          previousKept.s.slice(0, at) + previousKept.s.slice(at + passed.text.length);
+      }
+    }
+  };
   for (const item of items) {
     if (item.s === "") continue;
-    let current: TextRun | undefined = runs[run];
-    while (current !== undefined && !pairs(current, item)) {
-      run += 1;
-      current = runs[run];
+    let found = -1;
+    for (let index = next; index < runs.length; index += 1) {
+      const candidate = runs[index];
+      if (candidate !== undefined && pairs(candidate, item)) {
+        found = index;
+        break;
+      }
     }
-    // Unpaired items are dropped (fail closed); an item whose run is invisible likewise.
-    if (current === undefined || !runVisible(current, view)) continue;
-    text += (text === "" ? "" : eol ? "\n" : " ") + item.s;
-    eol = item.eol === true;
+    if (found !== -1) {
+      stripHidden(next, found);
+      current = runs[found];
+      next = found + 1;
+    }
+    const run = current ?? runs[next];
+    if (run === undefined || !runVisible(run, view)) {
+      previousKept = undefined;
+      continue;
+    }
+    previousKept = { s: item.s, eol: item.eol === true };
+    kept.push(previousKept);
+  }
+  stripHidden(next, runs.length);
+  let text = "";
+  let eol = false;
+  for (const entry of kept) {
+    if (entry.s.trim() === "") continue;
+    text += (text === "" ? "" : eol ? "\n" : " ") + entry.s;
+    eol = entry.eol;
   }
   return cleanText(text);
 }
@@ -281,7 +339,9 @@ parentPort.on("message", async (message) => {
         const op = ol.fnArray[i];
         const a = ol.argsArray[i];
         if (showOps.includes(op)) {
-          runs.push({ op, g: Array.isArray(a && a[0]) ? a[0].length : 0 });
+          const glyphs = (op === 47 ? a && a[2] : a && a[0]) || [];
+          const s = Array.from(glyphs, (g) => (g && typeof g === "object" ? (g.unicode ?? "") : "")).join("");
+          runs.push({ op, s });
         } else if (runOps.includes(op)) {
           runs.push({ op, a: Array.from(a || []).map(arg) });
         }

@@ -163,3 +163,34 @@ test("5.9 the page limit stops extraction and reports it", async () => {
     ["One.", "Two."],
   );
 });
+
+test("5.9 lines placed by Td under a scaled Tm keep their text, a hidden one among them does not", async (t) => {
+  const server = await startServer(t);
+  const cwd = await tempDir(t);
+  const stream = [
+    "BT /F1 1 Tf 10 0 0 10 72 700 Tm (First scaled line.) Tj",
+    "0 -1.2 Td (Second scaled line.) Tj",
+    "0 -1.2 Td 3 Tr (INJECTION-scaled-invisible) Tj 0 Tr",
+    "0 -1.2 Td (Fourth scaled line.) Tj ET",
+  ].join("\n");
+  server.route("/latex.pdf", pdf(buildPdf([stream])));
+  const result = await call(cwd, { url: `${server.origin}/latex.pdf` });
+  const markdown = await readFile(join(cwd, result.details.path), "utf8");
+  assert.match(markdown, /First scaled line\./);
+  assert.match(markdown, /Second scaled line\./);
+  assert.match(markdown, /Fourth scaled line\./);
+  assert.ok(!markdown.includes("INJECTION-"), markdown);
+});
+
+test("5.9 a hidden run that PDF.js merges into a visible item has its text removed", async (t) => {
+  const server = await startServer(t);
+  const cwd = await tempDir(t);
+  const stream =
+    "BT /F1 12 Tf 72 720 Td (Visible start ) Tj 3 Tr (INJECTION-merged) Tj 0 Tr ( visible end.) Tj ET";
+  server.route("/merged.pdf", pdf(buildPdf([stream])));
+  const result = await call(cwd, { url: `${server.origin}/merged.pdf` });
+  const markdown = await readFile(join(cwd, result.details.path), "utf8");
+  assert.match(markdown, /Visible start/);
+  assert.match(markdown, /visible end\./);
+  assert.ok(!markdown.includes("INJECTION-"), markdown);
+});
