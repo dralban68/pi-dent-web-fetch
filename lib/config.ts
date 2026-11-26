@@ -11,7 +11,7 @@ import { join } from "node:path";
 import { parseTree, type Node, type ParseError } from "jsonc-parser";
 
 const ROOT_KEY = "web";
-const WEB_KEYS: readonly string[] = ["reformat", "reformatModel"];
+const WEB_KEYS: readonly string[] = ["cache", "reformat", "reformatModel"];
 
 export type Environment = Readonly<Record<string, string | undefined>>;
 
@@ -23,6 +23,8 @@ export interface ConfigLayer {
 export interface WebConfig {
   readonly reformat?: boolean;
   readonly reformatModel?: string;
+  /** `web.cache`, trimmed, with the file of the layer that set it (Section 4.1). */
+  readonly cache?: { readonly value: string; readonly file: string };
   readonly modelClasses?: Readonly<Record<string, unknown>>;
   /** Each is reported as `pi-dent-web: <message>`. */
   readonly diagnostics: readonly string[];
@@ -195,13 +197,21 @@ export function resolveConfig(layers: {
       );
     }
   }
+  let cache: { cache?: { value: string; file: string } } = {};
+  if (Object.hasOwn(web, "cache")) {
+    const value = web.cache;
+    const file = ownerOf([ROOT_KEY, "cache"]);
+    if (typeof value === "string" && value.trim() !== "") {
+      cache = { cache: { value: value.trim(), file } };
+    } else diagnostics.push(`${file}: web.cache must be a non-empty string`);
+  }
   const unknown = Object.keys(web)
     .filter((key) => !WEB_KEYS.includes(key))
     .toSorted();
   if (unknown.length > 0) {
     diagnostics.push(`${ownerOf([ROOT_KEY])}: web has unknown keys ${unknown.join(", ")}`);
   }
-  return { ...reformat, ...model, ...modelClasses, diagnostics };
+  return { ...reformat, ...model, ...cache, ...modelClasses, diagnostics };
 }
 
 /** Both layers read, parsed and resolved; called once per extension instance (Section 8). */

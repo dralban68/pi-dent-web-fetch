@@ -4,6 +4,7 @@
  */
 
 import { readFileSync } from "node:fs";
+import { homedir, tmpdir } from "node:os";
 
 import type { AgentToolResult, ToolDefinition } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
@@ -22,11 +23,12 @@ import {
   type Meta,
   type ReformatMeta,
 } from "./cache.ts";
-import type { WebConfig } from "./config.ts";
+import type { Environment, WebConfig } from "./config.ts";
 import { contentKind, decodeBody } from "./decode.ts";
 import { WebFetchError, errorMessage } from "./errors.ts";
 import { extract } from "./extract.ts";
 import { fetchPage, systemResolver, type Resolver } from "./http.ts";
+import { chooseLocation, type CacheLocation } from "./location.ts";
 import { resolveModelString } from "./model.ts";
 import { isReusable, reformat, type Registry } from "./reformat.ts";
 import { canonicalIp } from "./address.ts";
@@ -48,10 +50,16 @@ export const WebFetchSchema = Type.Object({
       description: "Have the reformat model fix the Markdown's formatting; text is never changed",
     }),
   ),
+  cache: Type.Optional(
+    Type.String({
+      description:
+        'Where to cache: "project" (.pi/web-cache/ in the working directory), "session" (the session\'s temporary folder), or a folder path; omit it for the configured default',
+    }),
+  ),
 });
 
 export const WEBFETCH_DESCRIPTION =
-  "Fetch a web page (http or https) as Markdown and cache it under .pi/web-cache/ in the working directory. Returns the cache path of content.md, the status (fetched, cached, revalidated, stale) and a preview; read the rest of the page from the path. Text hidden from readers is removed. A fresh cached copy is served without network access.";
+  "Fetch a web page (http or https) as Markdown and cache it, by default under .pi/web-cache/ in the working directory. Returns the cache path of content.md, the status (fetched, cached, revalidated, stale) and a preview; read the rest of the page from the path. Text hidden from readers is removed. A fresh cached copy is served without network access.";
 
 export type FetchStatus = "fetched" | "cached" | "revalidated" | "stale";
 
@@ -60,6 +68,7 @@ export interface WebFetchDetails {
   readonly path: string;
   readonly extractedPath: string;
   readonly absolutePath: string;
+  readonly cacheDir: string;
   readonly url: string;
   readonly canonicalUrl: string;
   readonly finalUrl: string;
@@ -75,11 +84,18 @@ export interface WebFetchDetails {
 export interface WebFetchOptions {
   readonly resolve?: Resolver;
   readonly allowedAddresses?: readonly string[];
+  /** Section 4.1: the environment, read at each call; the home and temporary folders. */
+  readonly env?: Environment;
+  readonly homeDir?: string;
+  readonly tmpDir?: string;
 }
 
 export interface CallContext {
   readonly cwd: string;
   readonly modelRegistry: Registry;
+  readonly sessionManager?: { getSessionId(): string };
+  /** Reports a warning of Section 4.1 to the UI, when there is one. */
+  readonly warn?: (message: string) => void;
 }
 
 export interface WebFetchParams {
@@ -87,6 +103,7 @@ export interface WebFetchParams {
   readonly refresh?: boolean | undefined;
   readonly maxAgeHours?: number | undefined;
   readonly reformat?: boolean | undefined;
+  readonly cache?: string | undefined;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -124,10 +141,15 @@ export function reformatState(meta: ReformatMeta | null): string {
   return kept.length === 0 ? head : `${head}; ${total} kept: ${kept.join(", ")}`;
 }
 
-function resultText(details: WebFetchDetails, content: string, shown: string): string {
+function resultText(
+  details: WebFetchDetails,
+  underCwd: boolean,
+  content: string,
+  shown: string,
+): string {
   const lines = [
     `WebFetch: ${details.status}`,
-    `Path: ${details.path}`,
+    ...(underCwd ? [`Path: ${details.path}`] : []),
     `Absolute path: ${details.absolutePath}`,
     `Extracted: ${details.extractedPath}`,
     `Title: ${details.title ?? "(none)"}`,
@@ -155,7 +177,7 @@ async function fetchAndStore(
   canonical: string,
   paths: EntryPaths,
   previous: Entry | undefined,
-  cwd: string,
+  location: CacheLocation,
   notices: string[],
   signal: AbortSignal | undefined,
   options: WebFetchOptions,
@@ -171,7 +193,7 @@ async function fetchAndStore(
   const now = new Date().toISOString();
   if (response.status === 304 && previous !== undefined) {
     const meta: Meta = { ...previous.meta, fetchedAt: now };
-    await writeEntry(cwd, paths, [[paths.meta, serializeMeta(meta)]]);
+    await writeEntry(location, paths, [[paths.meta, serializeMeta(meta)]]);
     return { entry: { ...previous, meta }, status: "revalidated" };
   }
   const kind = contentKind(response.contentType, response.finalUrl);
@@ -193,7 +215,7 @@ async function fetchAndStore(
     extractedSha256: sha256(result.markdown),
     reformat: null,
   };
-  await writeEntry(cwd, paths, [
+  await writeEntry(location, paths, [
     [paths.extracted, result.markdown],
     [paths.content, result.markdown],
     [paths.meta, serializeMeta(meta)],
@@ -209,6 +231,7 @@ async function applyReformat(
   served: Entry,
   config: WebConfig,
   ctx: CallContext,
+  location: CacheLocation,
   paths: EntryPaths,
   notices: string[],
   signal: AbortSignal | undefined,
@@ -244,7 +267,7 @@ async function applyReformat(
     signal,
   });
   const next: Meta = { ...meta, reformat: result.meta };
-  await writeEntry(ctx.cwd, paths, [
+  await writeEntry(location, paths, [
     [paths.content, result.content],
     [paths.meta, serializeMeta(next)],
   ]);
@@ -265,8 +288,18 @@ export async function runWebFetch(
   }
   const url = validateUrl(params.url);
   const canonical = canonicalUrl(url);
-  const paths = entryPaths(ctx.cwd, canonical);
-  const notices: string[] = [];
+  const location = chooseLocation({
+    cwd: ctx.cwd,
+    param: params.cache,
+    setting: config.cache,
+    env: options.env ?? process.env,
+    homeDir: options.homeDir ?? homedir(),
+    tmpDir: options.tmpDir ?? tmpdir(),
+    sessionId: ctx.sessionManager?.getSessionId(),
+  });
+  for (const warning of location.warnings) ctx.warn?.(warning);
+  const paths = entryPaths(ctx.cwd, location.dir, canonical);
+  const notices: string[] = [...location.notices];
   const read = await readEntry(paths);
   if (read === "unreadable") notices.push(NOTICE_UNREADABLE);
   const entry = typeof read === "string" ? undefined : read;
@@ -282,7 +315,7 @@ export async function runWebFetch(
         canonical,
         paths,
         entry,
-        ctx.cwd,
+        location,
         notices,
         signal,
         options,
@@ -300,14 +333,15 @@ export async function runWebFetch(
 
   let final = served.entry;
   if (params.reformat ?? config.reformat ?? false) {
-    final = await applyReformat(final, config, ctx, paths, notices, signal);
+    final = await applyReformat(final, config, ctx, location, paths, notices, signal);
   }
   const shown = preview(final.content);
   const details: WebFetchDetails = {
     status: served.status,
-    path: paths.relativeContent,
-    extractedPath: paths.relativeExtracted,
+    path: paths.displayContent,
+    extractedPath: paths.displayExtracted,
     absolutePath: paths.content,
+    cacheDir: location.dir,
     url: params.url,
     canonicalUrl: canonical,
     finalUrl: final.meta.finalUrl,
@@ -318,7 +352,8 @@ export async function runWebFetch(
     reformat: final.meta.reformat,
     notices,
   };
-  return { content: [{ type: "text", text: resultText(details, final.content, shown) }], details };
+  const text = resultText(details, paths.relativeContent !== undefined, final.content, shown);
+  return { content: [{ type: "text", text }], details };
 }
 
 function isDetails(value: unknown): value is WebFetchDetails {
@@ -330,6 +365,8 @@ export function createWebFetchTool(
   config: () => WebConfig,
   options: WebFetchOptions = {},
 ): ToolDefinition<typeof WebFetchSchema, WebFetchDetails> {
+  // Section 4.1: each distinct warning is reported once per extension instance.
+  const warned = new Set<string>();
   return {
     name: "WebFetch",
     label: "Web Fetch",
@@ -337,7 +374,18 @@ export function createWebFetchTool(
     promptSnippet: "Fetch a web page as Markdown, cached in the working folder",
     parameters: WebFetchSchema,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      return runWebFetch(params, ctx, config(), signal, options);
+      const warn = (message: string): void => {
+        if (!ctx.hasUI || warned.has(message)) return;
+        warned.add(message);
+        ctx.ui.notify(`pi-dent-web: ${message}`, "warning");
+      };
+      const call: CallContext = {
+        cwd: ctx.cwd,
+        modelRegistry: ctx.modelRegistry,
+        sessionManager: ctx.sessionManager,
+        warn,
+      };
+      return runWebFetch(params, call, config(), signal, options);
     },
     renderCall(args) {
       return new Text(`WebFetch ${args.url}`, 0, 0);

@@ -120,17 +120,31 @@ export interface CallOptions {
   readonly resolve?: (host: string) => Promise<string[]>;
   readonly allowed?: readonly string[];
   readonly signal?: AbortSignal;
+  /** Section 2.2: the environment (default empty), home and temporary folders. */
+  readonly env?: Record<string, string>;
+  readonly homeDir?: string;
+  readonly tmpDir?: string;
+  readonly sessionId?: string;
+  readonly warn?: (message: string) => void;
 }
 
 /** Calls the tool's core with the test seam allowing the loopback server. */
 export function call(cwd: string, params: WebFetchParams, options: CallOptions = {}) {
   return runWebFetch(
     params,
-    { cwd, modelRegistry: options.registry ?? noModel },
+    {
+      cwd,
+      modelRegistry: options.registry ?? noModel,
+      sessionManager: { getSessionId: () => options.sessionId ?? "test-session" },
+      ...(options.warn === undefined ? {} : { warn: options.warn }),
+    },
     options.config ?? { diagnostics: [] },
     options.signal,
     {
       allowedAddresses: options.allowed ?? ["127.0.0.1"],
+      env: options.env ?? {},
+      homeDir: options.homeDir ?? join(cwd, "no-home"),
+      tmpDir: options.tmpDir ?? join(cwd, "no-tmp"),
       ...(options.resolve === undefined ? {} : { resolve: options.resolve }),
     },
   );

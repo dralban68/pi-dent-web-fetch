@@ -2,11 +2,11 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
-import { join, relative, sep } from "node:path";
+import { join } from "node:path";
 
 import { WebFetchError, errorMessage } from "./errors.ts";
+import { relativeUnder, type CacheLocation } from "./location.ts";
 
-export const CACHE_DIR = join(".pi", "web-cache");
 export const NOTICE_UNREADABLE = "The cache entry was unreadable and has been replaced.";
 
 export const KEPT_REASONS = [
@@ -63,9 +63,11 @@ export interface EntryPaths {
   readonly content: string;
   readonly extracted: string;
   readonly meta: string;
-  /** `content.md` and `extracted.md` relative to cwd, with `/` separators. */
-  readonly relativeContent: string;
-  readonly relativeExtracted: string;
+  /** `content.md` relative to cwd, with `/` separators, when it is under cwd (Section 4.1). */
+  readonly relativeContent: string | undefined;
+  /** The display paths of Section 4.1. */
+  readonly displayContent: string;
+  readonly displayExtracted: string;
 }
 
 export function sha256(text: string): string {
@@ -95,18 +97,19 @@ export function entryDirectory(canonical: string): string {
   return join(hostDirectory(url), `${slug(url)}-${sha256(canonical).slice(0, 8)}`);
 }
 
-export function entryPaths(cwd: string, canonical: string): EntryPaths {
-  const dir = join(cwd, CACHE_DIR, entryDirectory(canonical));
-  const toPosix = (path: string) => relative(cwd, path).split(sep).join("/");
+export function entryPaths(cwd: string, cacheDir: string, canonical: string): EntryPaths {
+  const dir = join(cacheDir, entryDirectory(canonical));
   const content = join(dir, "content.md");
   const extracted = join(dir, "extracted.md");
+  const relativeContent = relativeUnder(cwd, content);
   return {
     dir,
     content,
     extracted,
     meta: join(dir, "meta.json"),
-    relativeContent: toPosix(content),
-    relativeExtracted: toPosix(extracted),
+    relativeContent,
+    displayContent: relativeContent ?? content,
+    displayExtracted: relativeUnder(cwd, extracted) ?? extracted,
   };
 }
 
@@ -200,12 +203,15 @@ export async function readEntry(paths: EntryPaths): Promise<Entry | "absent" | "
   return isMeta(meta) ? { meta, extracted, content } : "unreadable";
 }
 
-/** Creates the cache directory and its `.gitignore` when absent (Section 4.1). */
-export async function ensureCacheDirectory(cwd: string): Promise<void> {
-  const dir = join(cwd, CACHE_DIR);
-  await mkdir(dir, { recursive: true });
+/**
+ * Creates the cache directory when absent, and its `.gitignore` when absent for an owned location,
+ * or when this call created a folder-path location (Section 4.1).
+ */
+export async function ensureCacheDirectory(location: CacheLocation): Promise<void> {
+  const created = await mkdir(location.dir, { recursive: true });
+  if (!location.owned && created === undefined) return;
   try {
-    await writeFile(join(dir, ".gitignore"), "*\n", { flag: "wx" });
+    await writeFile(join(location.dir, ".gitignore"), "*\n", { flag: "wx" });
   } catch (error) {
     if (!(isRecord(error) && error.code === "EEXIST")) throw error;
   }
@@ -216,13 +222,13 @@ export async function ensureCacheDirectory(cwd: string): Promise<void> {
  * skipping a file whose content is unchanged (Section 4.3).
  */
 export async function writeEntry(
-  cwd: string,
+  location: CacheLocation,
   paths: EntryPaths,
   files: readonly (readonly [path: string, text: string])[],
 ): Promise<void> {
   const temporary: string[] = [];
   try {
-    await ensureCacheDirectory(cwd);
+    await ensureCacheDirectory(location);
     await mkdir(paths.dir, { recursive: true });
     for (const [path, text] of files) {
       if ((await readOptional(path)) === text) continue;
