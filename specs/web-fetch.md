@@ -40,7 +40,19 @@ The extension MUST register exactly one tool, with `name` `WebFetch` and `label`
 The schema MUST declare `minimum: 0` for `maxAgeHours`; the tool MUST also refuse a negative or
 non-finite `maxAgeHours` with the tool error `WebFetch: maxAgeHours must be a number of 0 or more`.
 
-### 2.2 Test seam {#test-seam}
+### 2.2 Package {#package}
+
+The host installs the package with its `devDependencies` omitted and supplies the packages of
+`peerDependencies` itself. Every bare specifier that `index.ts` or a file of `lib/` imports or
+resolves MUST, under that install, name a package declared in `dependencies` (at the exact
+versions of [HTML pipeline](#html-pipeline) and [PDF](#pdf)), a peer package, or an entry point
+of one the host exposes, and the entry module MUST load from such an install.
+
+> Note (non-normative): a specifier that resolves only with the `devDependencies` installed, or
+> a peer entry point the host does not expose, works in a development checkout and fails a clean
+> install, where the `devDependencies` are absent.
+
+### 2.3 Test seam {#test-seam}
 
 The library MUST provide a factory that builds the tool from these options:
 
@@ -921,6 +933,10 @@ folded into a fence's info string (`html` and `css` before MDN-style code) accep
 that differs from the info string, and a label line with other text in it, each rejected with
 `text changed`; and an input fence that already has a language not letting the output drop an
 unrelated line before it.
+
+A manifest test MUST stage `package.json`, `index.ts` and `lib/` into a temporary folder whose
+`node_modules` holds symlinks to the packages of `dependencies` only, load the staged entry
+module through `discoverAndLoadExtensions`, and assert one extension and no load error.
 
 ## 11. Normative references {#normative-references}
 

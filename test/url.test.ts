@@ -70,7 +70,7 @@ test("3.4 classifies every blocked range, embedded IPv4 included, and passes pub
   for (const [ip, kind] of cases) assert.equal(blockedKind(ip), kind, ip);
 });
 
-test("2.2 allowed addresses compare in canonical form", () => {
+test("2.3 allowed addresses compare in canonical form", () => {
   assert.equal(canonicalIp("0:0:0:0:0:0:0:1"), "::1");
   assert.equal(canonicalIp("127.0.0.1"), "127.0.0.1");
 });
