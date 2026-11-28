@@ -46,7 +46,10 @@ The host installs the package with its `devDependencies` omitted and supplies th
 `peerDependencies` itself. Every bare specifier that `index.ts` or a file of `lib/` imports or
 resolves MUST, under that install, name a package declared in `dependencies` (at the exact
 versions of [HTML pipeline](#html-pipeline) and [PDF](#pdf)), a peer package, or an entry point
-of one the host exposes, and the entry module MUST load from such an install.
+of one the host exposes, and the entry module MUST load from such an install. Every package a
+bare specifier stated as a string literal in `index.ts` or a file of `lib/` names — its first
+two segments when it starts with `@`, else its first — MUST be declared in `dependencies` or
+`peerDependencies`.
 
 > Note (non-normative): a specifier that resolves only with the `devDependencies` installed, or
 > a peer entry point the host does not expose, works in a development checkout and fails a clean
@@ -936,7 +939,10 @@ unrelated line before it.
 
 A manifest test MUST stage `package.json`, `index.ts` and `lib/` into a temporary folder whose
 `node_modules` holds symlinks to the packages of `dependencies` only, load the staged entry
-module through `discoverAndLoadExtensions`, and assert one extension and no load error.
+module through `discoverAndLoadExtensions`, and assert one extension and no load error; the same
+or another test MUST statically scan `index.ts` and the files of `lib/` and assert that every
+bare specifier stated as a string literal — `node:` and relative paths excepted — names a
+package declared in `dependencies` or `peerDependencies`.
 
 ## 11. Normative references {#normative-references}
 
